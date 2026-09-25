@@ -1,0 +1,31 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Runtime data
+data/*
+!data/.gitkeep
+
+# Model weights
+*.pt
+*.onnx
+
+# Large demo media (keep README)
+demo/videos/*.mp4
+demo/videos/*.mov
+demo/*.mp4
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
