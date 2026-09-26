@@ -1,0 +1,48 @@
+# Values support ${ENV} and ${ENV:-default}.
+# Secrets must come from environment variables (.env) — literal API keys here are rejected.
+
+llm:
+  provider: ${LLM_PROVIDER:-openai}          # openai | mock
+  api_key: ${OPENAI_API_KEY:-}
+  chat_model: ${CHAT_MODEL:-gpt-4.1-mini}
+  extract_model: ${EXTRACT_MODEL:-gpt-4.1-mini}
+  asr_model: ${ASR_MODEL:-gpt-4o-transcribe}
+  tts_model: ${TTS_MODEL:-gpt-4o-mini-tts}
+  tts_voice: ${TTS_VOICE:-coral}
+  tts_instructions: "Speak slowly, warmly and clearly, like a caring family member."
+  vision_model: ${VISION_MODEL:-gpt-4.1-mini}
+  timeout_s: 15
+
+chat:
+  history_turns: 10
+  max_reply_tokens: 150
+
+symptoms:
+  merge_window_hours: 24
+  alert_debounce_hours: 2
+
+fall:
+  aspect_ratio_threshold: 1.2
+  torso_angle_deg: 60
+  drop_ratio: 0.35
+  drop_window_s: 0.6
+  down_confirm_s: 3
+  cooldown_s: 30
+  vision_verify: false
+  report_url: ${FALL_REPORT_URL:-http://localhost:8000/api/alerts}
+  mcp:
+    host: 127.0.0.1
+    port: 8001
+    events_path: data/fall_events.jsonl
+    snapshots_dir: data/snapshots
+    autostart_source: ${FALL_SOURCE:-demo/videos/fall_01.mp4}   # empty = wait for start_monitoring
+
+database:
+  url: ${DATABASE_URL:-sqlite:///data/app.db}   # relative sqlite paths resolve against the project root
+
+server:
+  host: ${HOST:-127.0.0.1}
+  port: ${PORT:-8000}
+
+paths:
+  data_dir: ${DATA_DIR:-data}                    # audio/ and snapshots/ live under here
