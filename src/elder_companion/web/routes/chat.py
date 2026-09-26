@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -118,7 +118,7 @@ def greet(service: ChatServiceDep, body: GreetIn | None = None) -> ChatOut:
     response_class=FileResponse,
     responses={200: {"content": {"audio/mpeg": {}}}, 204: {"description": "TTS unavailable"}},
 )
-def tts(message_id: int, service: ChatServiceDep) -> Response:
+def tts(message_id: int, request: Request, service: ChatServiceDep) -> Response:
     """mp3 of an assistant reply (generated once, then cached). 204 = speak/show text instead."""
     try:
         path = service.synthesize(message_id)
@@ -128,6 +128,11 @@ def tts(message_id: int, service: ChatServiceDep) -> Response:
         ) from e
     if path is None:
         return Response(status_code=204)
-    return FileResponse(
-        path, media_type="audio/mpeg", headers={"Cache-Control": "private, max-age=86400"}
-    )
+    # no-cache = revalidate with the ETag every time. Message ids restart after a DB reset,
+    # so a long max-age would make the browser replay stale audio for a new message.
+    stat = path.stat()
+    etag = f'"{message_id}-{stat.st_mtime_ns}-{stat.st_size}"'
+    headers = {"Cache-Control": "no-cache", "ETag": etag}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    return FileResponse(path, media_type="audio/mpeg", headers=headers)
