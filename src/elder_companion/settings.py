@@ -7,6 +7,7 @@ import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import yaml
 from dotenv import load_dotenv
@@ -54,8 +55,24 @@ class LLMSettings(_Model):
 
 
 class ChatSettings(_Model):
+    companion_name: str = "Sunny"
+    timezone: str = "America/Los_Angeles"  # the elder's local time (greetings, "yesterday")
     history_turns: int = 10
     max_reply_tokens: int = 150
+    follow_up_hours: float = 48  # unresolved symptoms this recent are offered for follow-up
+
+    @field_validator("timezone")
+    @classmethod
+    def _valid_timezone(cls, v: str) -> str:
+        try:
+            ZoneInfo(v)
+        except (ZoneInfoNotFoundError, ValueError) as e:
+            raise ValueError(f"unknown timezone {v!r}") from e
+        return v
+
+    @property
+    def tz(self) -> ZoneInfo:
+        return ZoneInfo(self.timezone)
 
 
 class SymptomSettings(_Model):

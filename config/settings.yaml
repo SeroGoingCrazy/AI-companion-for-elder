@@ -14,8 +14,11 @@ llm:
   timeout_s: 15
 
 chat:
-  history_turns: 10
+  companion_name: ${COMPANION_NAME:-Sunny}
+  timezone: ${ELDER_TIMEZONE:-America/Los_Angeles}   # elder's local time for greetings / "yesterday"
+  history_turns: 10                                  # turns = user+assistant pairs kept in context
   max_reply_tokens: 150
+  follow_up_hours: 48                                # unresolved symptoms this recent get a gentle follow-up
 
 symptoms:
   merge_window_hours: 24
