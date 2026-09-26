@@ -65,7 +65,8 @@ def test_system_prompt_has_persona_profile_and_time() -> None:
 
 def test_system_prompt_has_safety_rules() -> None:
     text = _ctx()[0]["content"]
-    assert "Never diagnose" in text
+    assert "Never guess what is causing a symptom" in text
+    assert "never diagnose" in text
     assert "911" in text
 
 

@@ -124,3 +124,11 @@ def test_invalid_chat_payload(client: TestClient, payload: dict) -> None:
 def test_unknown_elder_404(client: TestClient) -> None:
     assert client.post("/api/chat", json={"text": "hi", "elder_id": 99}).status_code == 404
     assert client.post("/api/chat/greet", json={"elder_id": 99}).status_code == 404
+
+
+def test_reply_is_limited_to_one_question(settings: Settings) -> None:
+    chatty = MockLLMClient({"chat": {"default": "Oh no. Is it your knee? Or your back?"}})
+    with TestClient(create_app(settings, llm=chatty)) as c:
+        body = c.post("/api/chat", json={"text": "I hurt"}).json()
+        assert body["reply_text"] == "Oh no. Is it your knee?"
+        assert [m.text for m in _messages(c)][-1] == "Oh no. Is it your knee?"  # saved trimmed
