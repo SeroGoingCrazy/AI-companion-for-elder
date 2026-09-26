@@ -279,8 +279,8 @@ family.js question → POST /api/family/ask
 
 ### 3.7 Model Layer Design
 
-- `LLMClient` is a thin wrapper around the OpenAI SDK: `chat()`, `extract_json(schema)`, `transcribe()`, `tts()`, `vision_check()`.
-- `MockLLMClient` implements the same interface and returns fixtures; used for unit tests and as an offline demo fallback (`LLM_PROVIDER=mock`).
+- `LLMClient` is a thin wrapper around the OpenAI SDK: `chat()`, `extract_json(schema)`, `transcribe()`, `tts()`. There is no `vision_check()` here: per 5.3, `fall_detector` must not import `elder_companion`, so F9 calls the OpenAI SDK directly.
+- `MockLLMClient` implements the same interface and replays `config/mock_llm.yaml` (which covers the demo-script lines); used for unit tests and as an offline demo fallback (`LLM_PROVIDER=mock`).
 - Timeouts and degradation:
   - Transcription fails → frontend prompt "Sorry, I didn't catch that — could you say it again?" (with a text input as fallback)
   - Chat fails → fixed reassuring reply
@@ -403,6 +403,7 @@ AI-for-elder/
 ├── DEV_SPEC.md
 ├── config/
 │   ├── settings.yaml             # models, context turns, alert debounce, fall parameters
+│   ├── mock_llm.yaml             # canned replies for LLM_PROVIDER=mock (tests + offline demo)
 │   ├── symptoms.yaml             # single source of truth: symptom enum, display names, alert levels
 │   └── prompts/
 │       ├── companion.txt         # elder-app persona
@@ -416,7 +417,9 @@ AI-for-elder/
 │   │   ├── db.py                 # engine / session
 │   │   ├── models.py             # Elder / Message / SymptomLog / Alert
 │   │   ├── seed.py               # demo elder profile + optional history
-│   │   ├── llm/{client.py, mock.py}
+│   │   ├── elders.py             # get_elder / ElderNotFound
+│   │   ├── prompts.py            # load/render config/prompts/*.txt (string.Template)
+│   │   ├── llm/{client.py, mock.py, __main__.py}
 │   │   ├── chat/{service.py, context.py}
 │   │   ├── symptoms/{schema.py, extractor.py, merge.py, rules.py}
 │   │   ├── alerts/{service.py, bus.py}
@@ -473,8 +476,8 @@ elder_companion.family_agent (E5) ──▶ accesses fall data only through the 
 | Method | Path | Request / Response | Owner |
 |---|---|---|---|
 | GET | `/elder`, `/family` | Pages | A |
-| POST | `/api/chat` | multipart `audio` or JSON `{text}` → `{message_id, user_text, reply_text}` | A |
-| POST | `/api/chat/greet` | → `{message_id, reply_text}` | A |
+| POST | `/api/chat` | multipart `audio` or JSON `{text}` → `{message_id, user_text, reply_text, fallback}` | A |
+| POST | `/api/chat/greet` | optional `{elder_id}` → `{message_id, user_text: "", reply_text, fallback}` | A |
 | GET | `/api/tts/{message_id}` | → `audio/mpeg` | A |
 | GET | `/api/messages?limit=` | Conversation history | A |
 | GET | `/api/symptoms?days=7` | Symptom log (grouped by day) | A |
@@ -507,8 +510,11 @@ llm:
   tts_instructions: "Speak slowly, warmly and clearly, like a caring family member."
   timeout_s: 15
 chat:
+  companion_name: ${COMPANION_NAME:-Sunny}
+  timezone: ${ELDER_TIMEZONE:-America/Los_Angeles}   # elder's local time
   history_turns: 10
   max_reply_tokens: 150
+  follow_up_hours: 48
 symptoms:
   merge_window_hours: 24
   alert_debounce_hours: 2
@@ -562,7 +568,7 @@ fall:
 | Stage | Tasks | Status |
 |---|---|---|
 | A | A1 A2 A3 | ✅✅✅ |
-| B | B1 B2 B3 | ⬜⬜⬜ |
+| B | B1 B2 B3 | ✅✅✅ |
 | C | C1 C2 C3 | ⬜⬜⬜ |
 | D | D1 D2 D3 D4 | ⬜⬜⬜⬜ |
 | E | E1 E2 E3 E4 E5* | ⬜⬜⬜⬜⬜ |
@@ -571,7 +577,7 @@ fall:
 
 ### 📈 Overall Progress
 
-`3 / 31` (* = optional task, not required for delivery)
+`6 / 31` (* = optional task, not required for delivery)
 
 ---
 
@@ -604,27 +610,27 @@ fall:
 
 ## Stage B: Chat Core (goal: warm text chat)
 
-### B1: LLMClient and mock
+### B1: LLMClient and mock ✅
 - **Owner**: A
-- **Goal**: wrap `chat(messages)`, `extract_json(messages, schema)`, `transcribe(file)`, `tts(text) -> bytes`, `vision_check(image, prompt)`; a mock with the same interface (returns fixtures matched by keyword); unified timeouts and a common `LLMError` exception type.
-- **Files**: `llm/client.py`, `llm/mock.py`, `tests/unit/test_llm_mock.py`, `tests/fixtures/mock_llm.yaml`.
+- **Goal**: wrap `chat(messages)`, `extract_json(messages, schema)`, `transcribe(file)`, `tts(text) -> bytes`; a mock with the same interface (returns fixtures matched by keyword); unified timeouts and a common `LLMError` exception type. (`vision_check` dropped — see 3.7.)
+- **Files**: `llm/client.py`, `llm/mock.py`, `llm/__main__.py`, `config/mock_llm.yaml`, `tests/unit/test_llm_mock.py`.
 - **Classes/functions**: `BaseLLMClient`, `OpenAIClient`, `MockLLMClient`, `get_llm(settings)`.
 - **Acceptance**: with `LLM_PROVIDER=mock`, every method returns offline.
-- **How to test**: `uv run pytest -q tests/unit/test_llm_mock.py`; manually `uv run python -m elder_companion.llm.client --ping` (real key).
+- **How to test**: `uv run pytest -q tests/unit/test_llm_mock.py` (OpenAIClient is exercised against a fake HTTP transport); manually `uv run python -m elder_companion.llm --ping` (real key).
 
-### B2: Persona prompt and context building
+### B2: Persona prompt and context building ✅
 - **Owner**: A
 - **Goal**: write `companion.txt` (warm, short sentences, one question at a time, follows the elder's language, no diagnosis or medication advice, suggests contacting family / 911 for dangerous situations); `build_context()` combines profile + current time + unresolved symptoms from the last 48h + last 10 turns.
-- **Files**: `config/prompts/companion.txt`, `config/prompts/greet.txt`, `chat/context.py`, `tests/unit/test_context.py`.
-- **Classes/functions**: `build_context(elder, history, recent_symptoms, now) -> list[dict]`.
+- **Files**: `config/prompts/companion.txt`, `config/prompts/greet.txt`, `prompts.py`, `chat/context.py`, `settings.py` (`chat.companion_name`, `chat.timezone`, `chat.follow_up_hours`), `tests/unit/test_context.py`.
+- **Classes/functions**: `build_context(elder, history, recent_symptoms, now) -> list[dict]`, `build_greet_context(...)`, `render_prompt(name, **values)`.
 - **Acceptance**: unit tests assert the context contains the profile and symptom follow-up info, and that turn truncation is correct.
 - **How to test**: `uv run pytest -q tests/unit/test_context.py`.
 
-### B3: Text chat endpoint
+### B3: Text chat endpoint ✅
 - **Owner**: A
 - **Goal**: `POST /api/chat` (JSON `{text}`) and `POST /api/chat/greet`; messages persisted; LLM failure returns a fixed reassuring reply.
-- **Files**: `chat/service.py`, `web/routes/chat.py`, `tests/integration/test_chat_api.py`.
-- **Classes/functions**: `ChatService.reply(elder_id, text) -> ChatResult`, `ChatService.greet(elder_id)`.
+- **Files**: `chat/service.py`, `web/routes/chat.py`, `web/deps.py`, `web/app.py`, `elders.py`, `tests/integration/test_chat_api.py`.
+- **Classes/functions**: `ChatService.reply(elder_id, text) -> ChatResult`, `ChatService.greet(elder_id)`. Responses also carry `fallback: bool`.
 - **Acceptance**: curl with text gets a reply in the matching language (Chinese/English); the message table has two rows.
 - **How to test**: `uv run pytest -q tests/integration/test_chat_api.py` (mock); manually chat 5 turns against the real API to check the persona.
 
