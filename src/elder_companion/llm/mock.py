@@ -65,7 +65,9 @@ class MockLLMClient(BaseLLMClient):
         self.calls.append(("extract_json", {"name": name, "messages": messages}))
         cfg = self.config.get("json", {}).get(name, {})
         user_text = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
-        rule = _match(user_text, cfg.get("rules", []))
+        # Match only the last paragraph: extraction puts earlier turns before the utterance,
+        # and a symptom mentioned back there must not fire its rule again.
+        rule = _match(user_text.rsplit("\n\n", 1)[-1], cfg.get("rules", []))
         return copy.deepcopy(rule["result"] if rule else cfg.get("default", {}))
 
     def transcribe(self, audio: bytes, *, filename: str, language: str | None = None) -> str:

@@ -20,8 +20,65 @@ chat:
     - match: ["lonely", "alone", "孤单", "一个人"]
       reply: "I'm right here with you, Maggie. Would you like to tell me about your day, or maybe give Leo a call later?"
 
-# Structured-output responses keyed by schema name. Stage D adds symptom_extraction rules.
-json: {}
+# Structured-output responses keyed by schema name; rules match the latest user message.
+# symptom_extraction: raw_quote must be a substring of the utterance or the extractor drops it,
+# so quotes here are the shortest keyword that the rule matches on. Rules that match either
+# language list one entry per language; the one whose quote is absent gets dropped.
+json:
+  symptom_extraction:
+    default: {symptoms: []}
+    rules:
+      - match: ["胸口", "喘不"]
+        result:
+          symptoms:
+            - {canonical: chest_pain, label: 胸口闷, body_part: chest, severity: unknown,
+               duration: null, onset: null, status: new, raw_quote: 胸口}
+            - {canonical: shortness_of_breath, label: 喘不上气, body_part: null, severity: unknown,
+               duration: null, onset: null, status: new, raw_quote: 喘不}
+      - match: ["chest", "catch my breath"]
+        result:
+          symptoms:
+            - {canonical: chest_pain, label: chest tightness, body_part: chest, severity: unknown,
+               duration: null, onset: null, status: new, raw_quote: chest}
+            - {canonical: shortness_of_breath, label: can't catch breath, body_part: null,
+               severity: unknown, duration: null, onset: null, status: new,
+               raw_quote: catch my breath}
+      - match: ["头有点晕"]
+        result:
+          symptoms:
+            - {canonical: dizziness, label: 早上起床头晕, body_part: head, severity: mild,
+               duration: 2 days, onset: mornings, status: new, raw_quote: 头有点晕}
+      - match: ["头晕"]
+        result:
+          symptoms:
+            - {canonical: dizziness, label: 头晕, body_part: head, severity: unknown,
+               duration: null, onset: null, status: new, raw_quote: 头晕}
+      - match: ["dizzy"]
+        result:
+          symptoms:
+            - {canonical: dizziness, label: dizziness, body_part: head, severity: unknown,
+               duration: null, onset: null, status: new, raw_quote: dizzy}
+      - match: ["fell", "摔"]
+        result:
+          symptoms:
+            - {canonical: fall, label: fall, body_part: null, severity: unknown,
+               duration: null, onset: null, status: new, raw_quote: fell}
+            - {canonical: fall, label: 摔倒, body_part: null, severity: unknown,
+               duration: null, onset: null, status: new, raw_quote: 摔}
+      - match: ["sleep well", "没睡好"]
+        result:
+          symptoms:
+            - {canonical: insomnia, label: poor sleep, body_part: null, severity: unknown,
+               duration: null, onset: last night, status: new, raw_quote: sleep well}
+            - {canonical: insomnia, label: 没睡好, body_part: null, severity: unknown,
+               duration: null, onset: last night, status: new, raw_quote: 没睡好}
+      - match: ["knee", "膝盖"]
+        result:
+          symptoms:
+            - {canonical: joint_pain, label: knee pain, body_part: knee, severity: unknown,
+               duration: null, onset: null, status: ongoing, raw_quote: knee}
+            - {canonical: joint_pain, label: 膝盖疼, body_part: knee, severity: unknown,
+               duration: null, onset: null, status: ongoing, raw_quote: 膝盖}
 
 transcribe:
   default: "Good morning! I'm doing okay today."
