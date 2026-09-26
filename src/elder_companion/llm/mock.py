@@ -1,0 +1,79 @@
+"""Offline LLM for tests and as a demo fallback (LLM_PROVIDER=mock).
+
+Replies come from config/mock_llm.yaml.
+"""
+
+from __future__ import annotations
+
+import copy
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from elder_companion.llm.client import BaseLLMClient, ChatMessage
+from elder_companion.settings import PROJECT_ROOT
+
+DEFAULT_MOCK_CONFIG = PROJECT_ROOT / "config" / "mock_llm.yaml"
+
+# Transcribe shortcut for tests and scripted demos: audio bytes b"MOCK:<text>" transcribe to <text>.
+MOCK_AUDIO_PREFIX = b"MOCK:"
+
+# One silent MPEG-1 Layer III frame (128 kbps, 44.1 kHz); a few of them make a valid tiny mp3.
+_SILENT_MP3_FRAME = b"\xff\xfb\x90\x64" + b"\x00" * 413
+SILENT_MP3 = _SILENT_MP3_FRAME * 4
+
+_CJK = re.compile(r"[一-鿿]")
+
+
+def _match(text: str, rules: list[dict[str, Any]]) -> dict[str, Any] | None:
+    lowered = text.lower()
+    for rule in rules:
+        if any(k.lower() in lowered for k in rule.get("match", [])):
+            return rule
+    return None
+
+
+@dataclass
+class MockLLMClient(BaseLLMClient):
+    config: dict[str, Any]
+    calls: list[tuple[str, Any]] = field(default_factory=list)
+
+    @classmethod
+    def from_config(cls, path: Path = DEFAULT_MOCK_CONFIG) -> MockLLMClient:
+        return cls(yaml.safe_load(path.read_text(encoding="utf-8")) or {})
+
+    def chat(self, messages: list[ChatMessage], *, max_tokens: int | None = None) -> str:
+        self.calls.append(("chat", messages))
+        cfg = self.config.get("chat", {})
+        # A conversation ending in a system instruction is a greeting request.
+        if messages and messages[-1]["role"] == "system":
+            return cfg.get("greet", "Hello! How are you today?")
+        user_text = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
+        rule = _match(user_text, cfg.get("rules", []))
+        if rule:
+            return rule["reply"]
+        if _CJK.search(user_text):
+            return cfg.get("default_zh", cfg.get("default", "嗯，我在听。"))
+        return cfg.get("default", "I'm listening.")
+
+    def extract_json(
+        self, messages: list[ChatMessage], *, schema: dict[str, Any], name: str
+    ) -> dict[str, Any]:
+        self.calls.append(("extract_json", {"name": name, "messages": messages}))
+        cfg = self.config.get("json", {}).get(name, {})
+        user_text = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
+        rule = _match(user_text, cfg.get("rules", []))
+        return copy.deepcopy(rule["result"] if rule else cfg.get("default", {}))
+
+    def transcribe(self, audio: bytes, *, filename: str, language: str | None = None) -> str:
+        self.calls.append(("transcribe", filename))
+        if audio.startswith(MOCK_AUDIO_PREFIX):
+            return audio[len(MOCK_AUDIO_PREFIX) :].decode("utf-8").strip()
+        return self.config.get("transcribe", {}).get("default", "")
+
+    def tts(self, text: str) -> bytes:
+        self.calls.append(("tts", text))
+        return SILENT_MP3

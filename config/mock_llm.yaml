@@ -1,0 +1,27 @@
+# Canned responses for LLM_PROVIDER=mock (offline tests + demo fallback when the network is down).
+# chat rules match case-insensitive substrings of the latest user message; first match wins.
+# Keep the demo-script lines (DEV_SPEC "Demo Script") covered here so the demo can replay offline.
+
+chat:
+  greet: "Good morning, Maggie! How did you sleep last night? And how is that knee feeling today?"
+  default: "That's lovely to hear, Maggie. Tell me a little more?"
+  default_zh: "嗯嗯，我在听呢。能再多跟我说说吗？"
+  rules:
+    - match: ["chest", "can't breathe", "can't catch my breath", "胸口", "喘不"]
+      reply: "Maggie, that could be serious. Please call 911 right now, and then call Emily. I'm right here with you."
+    - match: ["头晕", "头有点晕"]
+      reply: "头晕可要当心。是起床的时候比较晕，还是一整天都晕？这几天血压药都按时吃了吗？"
+    - match: ["dizzy", "dizziness"]
+      reply: "I'm sorry you're feeling dizzy. Does it happen mostly when you stand up, or all day long?"
+    - match: ["sleep", "slept", "睡"]
+      reply: "Oh no, a rough night is no fun. Was something on your mind, or were you just restless?"
+    - match: ["knee", "膝盖"]
+      reply: "I'm glad the knee is doing better. Will you get out to the garden today?"
+    - match: ["lonely", "alone", "孤单", "一个人"]
+      reply: "I'm right here with you, Maggie. Would you like to tell me about your day, or maybe give Leo a call later?"
+
+# Structured-output responses keyed by schema name. Stage D adds symptom_extraction rules.
+json: {}
+
+transcribe:
+  default: "Good morning! I'm doing okay today."
