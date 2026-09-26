@@ -47,6 +47,10 @@ def create_app(settings: Settings | None = None, llm: BaseLLMClient | None = Non
     app.include_router(family.router)
     app.include_router(pages.router)
     app.mount("/static", StaticFiles(directory=pages.WEB_DIR / "static"), name="static")
+    # Fall snapshots: alert.snapshot_path "snapshots/x.jpg" is served at /media/snapshots/x.jpg.
+    snapshots_dir = settings.paths.snapshots_dir
+    snapshots_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/media/snapshots", StaticFiles(directory=snapshots_dir), name="snapshots")
 
     @app.get("/healthz", tags=["meta"])
     def healthz() -> dict[str, str]:

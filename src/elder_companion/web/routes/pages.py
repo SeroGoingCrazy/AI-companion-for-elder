@@ -36,3 +36,27 @@ def elder_page(request: Request, session: SessionDep, elder_id: int | None = Non
             "app_config": {"elderId": elder.id, "nickname": elder.nickname},
         },
     )
+
+
+@router.get("/family", response_class=HTMLResponse)
+def family_page(request: Request, session: SessionDep, elder_id: int | None = None) -> HTMLResponse:
+    try:
+        elder = get_elder(session, elder_id)
+    except ElderNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    settings = request.app.state.settings
+    return templates.TemplateResponse(
+        request,
+        "family.html",
+        {
+            "elder": elder,
+            "companion_name": settings.chat.companion_name,
+            "app_config": {
+                "elderId": elder.id,
+                "nickname": elder.nickname,
+                "timezone": settings.chat.timezone,
+                # fall-mcp's MJPEG view; the page uses its own hostname with this port
+                "fallStreamPort": settings.fall.mcp.port,
+            },
+        },
+    )

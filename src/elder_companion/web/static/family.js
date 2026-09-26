@@ -1,0 +1,356 @@
+/* Family dashboard: today's summary, alerts (live over SSE), symptom timeline, fall view,
+ * conversation history.
+ *
+ * GET /api/alerts/stream sends `alert` (new alert: banner + sound) and `activity` (the elder
+ * said something: reload the timeline and history). All text is inserted with textContent.
+ */
+(() => {
+  "use strict";
+
+  const cfg = window.APP_CONFIG || {};
+  const $ = (id) => document.getElementById(id);
+  const tz = cfg.timezone || undefined;
+
+  const STATUS_TEXT = { new: "new", ongoing: "ongoing", improved: "improving", resolved: "resolved" };
+  const HISTORY_PAGE = 30;
+  const ACTIVITY_DEBOUNCE_MS = 800;
+  const FALL_RETRY_MS = 15000;
+
+  // ---------- helpers ----------
+
+  const LOCALE = "en-US"; // the page is English; don't mix in the browser's date language
+
+  const timeFmt = new Intl.DateTimeFormat(LOCALE, { timeZone: tz, hour: "numeric", minute: "2-digit" });
+  const dayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });
+  const dateFmt = new Intl.DateTimeFormat(LOCALE, { timeZone: tz, weekday: "short", month: "short", day: "numeric" });
+
+  const fmtTime = (iso) => timeFmt.format(new Date(iso));
+  function fmtWhen(iso) {
+    // "3:05 PM" today, "Yesterday 3:05 PM", else "Sat, Sep 26 3:05 PM" (elder's time zone)
+    const d = new Date(iso);
+    const day = dayFmt.format(d);
+    const today = dayFmt.format(new Date());
+    const yesterday = dayFmt.format(new Date(Date.now() - 864e5));
+    if (day === today) return fmtTime(iso);
+    if (day === yesterday) return `Yesterday ${fmtTime(iso)}`;
+    return `${dateFmt.format(d)} ${fmtTime(iso)}`;
+  }
+
+  function el(tag, props = {}, ...children) {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(props)) {
+      if (v == null || v === false) continue;
+      if (k === "class") node.className = v;
+      else if (k === "text") node.textContent = v;
+      else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+      else node.setAttribute(k, v === true ? "" : v);
+    }
+    for (const c of children) if (c != null) node.append(c);
+    return node;
+  }
+
+  async function api(path, options) {
+    const r = await fetch(path, options);
+    if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
+    return r.json();
+  }
+
+  function severityClass(s) {
+    if (s.red_flag) return "sev-red";
+    return `sev-${s.severity}`;
+  }
+
+  // ---------- summary ----------
+
+  let summaryStale = false;
+
+  async function loadSummary(refresh = false) {
+    const btn = $("summary-refresh");
+    btn.disabled = true;
+    btn.textContent = "Updating…";
+    try {
+      const s = await api(`/api/summary/today${refresh ? "?refresh=true" : ""}`);
+      $("summary-text").textContent = s.summary;
+      $("summary-text").classList.toggle("muted", s.empty);
+      $("summary-meta").textContent = s.empty
+        ? ""
+        : `Updated ${fmtTime(s.generated_at)}${s.fallback ? " · AI summary unavailable, showing a plain list" : ""}`;
+      setSummaryStale(false);
+    } catch (e) {
+      console.error(e);
+      $("summary-meta").textContent = "Couldn't load the summary. Try Refresh.";
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Refresh";
+    }
+  }
+
+  function setSummaryStale(stale) {
+    summaryStale = stale;
+    $("summary-refresh").classList.toggle("btn-attention", stale);
+    const meta = $("summary-meta");
+    if (stale && !meta.textContent.includes("New activity")) {
+      meta.textContent = [meta.textContent, "New activity since this summary"].filter(Boolean).join(" · ");
+    }
+  }
+
+  // ---------- alerts ----------
+
+  const alerts = new Map(); // id -> alert
+  let bannerAlert = null;
+
+  function alertItem(a) {
+    const isFall = a.type === "fall";
+    const snapshot = a.snapshot_path
+      ? el("a", { class: "snapshot", href: `/media/${a.snapshot_path}`, target: "_blank", rel: "noopener" },
+          el("img", { src: `/media/${a.snapshot_path}`, alt: "Snapshot at the time of the fall", loading: "lazy" }))
+      : null;
+    const read = a.is_read
+      ? null
+      : el("button", { class: "btn btn-quiet btn-small", type: "button", text: "Mark read", onclick: () => markRead(a.id) });
+    return el("li", { class: `alert-item level-${a.level}${a.is_read ? " is-read" : ""}`, "data-id": a.id },
+      el("div", { class: "alert-icon", "aria-hidden": "true", text: isFall ? "🧍" : "🩺" }),
+      el("div", { class: "alert-main" },
+        el("p", { class: "alert-title" },
+          el("span", { class: `level-badge level-${a.level}`, text: a.level === "high" ? "Urgent" : "Watch" }),
+          " ", a.title),
+        a.content ? el("p", { class: "alert-content", text: a.content }) : null,
+        el("p", { class: "meta", text: `${isFall ? "Fall detection" : "From chat"} · ${fmtWhen(a.created_at)}` })),
+      snapshot, read);
+  }
+
+  function renderAlerts() {
+    const list = [...alerts.values()].sort((a, b) => b.id - a.id);
+    $("alert-list").replaceChildren(...list.map(alertItem));
+    $("alerts-empty").hidden = list.length > 0;
+    const unread = list.filter((a) => !a.is_read).length;
+    $("unread-count").hidden = unread === 0;
+    $("unread-count").textContent = `${unread} new`;
+    document.title = `${unread ? `(${unread}) ` : ""}${cfg.nickname}'s day`;
+  }
+
+  async function loadAlerts() {
+    try {
+      const list = await api("/api/alerts?limit=30");
+      alerts.clear();
+      for (const a of list) alerts.set(a.id, a);
+      renderAlerts();
+      // Opening the dashboard after something happened: show the newest unread urgent alert.
+      const urgent = list.find((a) => !a.is_read && a.level === "high");
+      if (urgent && !bannerAlert) showAlertBanner(urgent, { sound: false });
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function markRead(id) {
+    try {
+      const a = await api(`/api/alerts/${id}/read`, { method: "POST" });
+      alerts.set(a.id, a);
+      renderAlerts();
+      if (bannerAlert && bannerAlert.id === id) {
+        hideBanner();
+        // e.g. "chest pain" and "shortness of breath" arrive together: show the next one
+        const next = [...alerts.values()].sort((x, y) => y.id - x.id).find((x) => !x.is_read && x.level === "high");
+        if (next) showAlertBanner(next, { sound: false });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  function showAlertBanner(a, { sound = true } = {}) {
+    bannerAlert = a;
+    const banner = $("alert-banner");
+    banner.dataset.level = a.level;
+    $("banner-title").textContent = a.title;
+    $("banner-content").textContent = a.content || (a.type === "fall" ? "A fall was detected." : "");
+    $("banner-time").textContent = `${a.type === "fall" ? "Fall detection" : "From chat"} · ${fmtWhen(a.created_at)}`;
+    banner.hidden = false;
+    if (sound) beep(a.level);
+  }
+
+  function hideBanner() {
+    $("alert-banner").hidden = true;
+    bannerAlert = null;
+  }
+
+  // ---------- sound (browsers only allow audio after a user gesture) ----------
+
+  let audioCtx = null;
+  let soundOn = false;
+
+  function setSound(on) {
+    soundOn = on;
+    if (on && !audioCtx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (Ctx) audioCtx = new Ctx();
+    }
+    if (on && audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+    const btn = $("sound-btn");
+    btn.setAttribute("aria-pressed", String(on));
+    btn.textContent = on ? "🔔 Sound on" : "🔕 Sound off";
+  }
+
+  function beep(level) {
+    if (!soundOn || !audioCtx) return;
+    const tones = level === "high" ? [880, 660, 880, 660] : [660, 520];
+    let t = audioCtx.currentTime;
+    for (const freq of tones) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(0.3, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(t);
+      osc.stop(t + 0.25);
+      t += 0.28;
+    }
+  }
+
+  // ---------- symptom timeline ----------
+
+  function symptomRow(s) {
+    const details = [
+      s.body_part && `Where: ${s.body_part}`,
+      s.duration && `How long: ${s.duration}`,
+      s.onset && `When: ${s.onset}`,
+      `Severity: ${s.severity === "unknown" ? "not stated" : s.severity}`,
+      `Last mentioned ${fmtTime(s.last_seen)}`,
+    ].filter(Boolean);
+    const name = s.canonical === "other" ? s.label : s.display_en;
+    return el("li", { class: "symptom" },
+      el("details", {},
+        el("summary", {},
+          el("span", { class: `chip ${severityClass(s)}` },
+            name, s.count > 1 ? el("span", { class: "chip-count", text: ` ×${s.count}` }) : null),
+          el("span", { class: `sym-status sym-status-${s.status}`, text: STATUS_TEXT[s.status] || s.status })),
+        el("div", { class: "symptom-detail" },
+          el("blockquote", { class: "quote", lang: /[一-鿿]/.test(s.raw_quote) ? "zh" : "en", text: `“${s.raw_quote}”` }),
+          el("p", { class: "meta", text: details.join(" · ") }))));
+  }
+
+  async function loadSymptoms() {
+    try {
+      const data = await api("/api/symptoms?days=7");
+      const days = data.days.map((d) =>
+        el("li", { class: `day${d.symptoms.length ? "" : " is-empty"}` },
+          el("h3", { class: "day-label", text: d.label }),
+          d.symptoms.length
+            ? el("ul", { class: "symptom-list" }, ...d.symptoms.map(symptomRow))
+            : el("p", { class: "empty", text: "Nothing mentioned" })));
+      $("timeline").replaceChildren(...days);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  // ---------- conversation history ----------
+
+  let oldestId = null;
+
+  function historyItem(m) {
+    const who = m.role === "user" ? cfg.nickname : "Companion";
+    return el("li", { class: `history-msg ${m.role}` },
+      el("p", { class: "meta", text: `${who} · ${fmtWhen(m.created_at)}` }),
+      el("p", { class: "history-text", text: m.text }));
+  }
+
+  async function loadHistory() {
+    try {
+      const msgs = await api(`/api/messages?limit=${HISTORY_PAGE}`);
+      $("history-list").replaceChildren(...msgs.map(historyItem));
+      oldestId = msgs.length ? msgs[0].id : null;
+      $("history-older").hidden = msgs.length < HISTORY_PAGE;
+      const todayKey = dayFmt.format(new Date());
+      const today = msgs.filter((m) => m.role === "user" && dayFmt.format(new Date(m.created_at)) === todayKey).length;
+      $("history-meta").textContent = `${today} message${today === 1 ? "" : "s"} from ${cfg.nickname} today`;
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function loadOlderHistory() {
+    if (oldestId == null) return;
+    try {
+      const msgs = await api(`/api/messages?limit=${HISTORY_PAGE}&before_id=${oldestId}`);
+      $("history-list").prepend(...msgs.map(historyItem));
+      if (msgs.length) oldestId = msgs[0].id;
+      $("history-older").hidden = msgs.length < HISTORY_PAGE;
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  // ---------- fall-detection view (fall-mcp MJPEG, may not be running) ----------
+
+  function connectFallStream() {
+    const img = $("fall-stream");
+    const url = `${location.protocol}//${location.hostname}:${cfg.fallStreamPort}/stream`;
+    img.onload = () => {
+      img.hidden = false;
+      $("fall-offline").hidden = true;
+      $("fall-status").textContent = "Live";
+    };
+    img.onerror = () => {
+      img.hidden = true;
+      $("fall-offline").hidden = false;
+      $("fall-status").textContent = "Offline";
+      setTimeout(() => { img.src = `${url}?t=${Date.now()}`; }, FALL_RETRY_MS);
+    };
+    img.src = url;
+  }
+
+  // ---------- live updates ----------
+
+  let activityTimer = null;
+
+  function connectAlertStream() {
+    const live = $("live");
+    const setLive = (state, text) => { live.dataset.state = state; $("live-text").textContent = text; };
+    const source = new EventSource("/api/alerts/stream");
+    let dropped = false;
+
+    source.addEventListener("open", () => {
+      setLive("live", "Live");
+      if (dropped) { loadAlerts(); loadSymptoms(); loadHistory(); } // catch up on missed events
+      dropped = false;
+    });
+    source.addEventListener("error", () => {
+      dropped = true;
+      setLive("down", "Reconnecting…"); // EventSource retries by itself
+    });
+    source.addEventListener("alert", (ev) => {
+      const a = JSON.parse(ev.data);
+      alerts.set(a.id, a);
+      renderAlerts();
+      showAlertBanner(a);
+      if (a.type === "symptom") setSummaryStale(true);
+    });
+    source.addEventListener("activity", () => {
+      setSummaryStale(true);
+      clearTimeout(activityTimer);
+      activityTimer = setTimeout(() => { loadSymptoms(); loadHistory(); }, ACTIVITY_DEBOUNCE_MS);
+    });
+  }
+
+  // ---------- start ----------
+
+  $("summary-refresh").addEventListener("click", () => loadSummary(true));
+  $("banner-read").addEventListener("click", () => bannerAlert && markRead(bannerAlert.id));
+  $("banner-close").addEventListener("click", hideBanner);
+  $("sound-btn").addEventListener("click", () => setSound(!soundOn));
+  $("history-older").addEventListener("click", loadOlderHistory);
+
+  loadSummary();
+  loadAlerts();
+  loadSymptoms();
+  loadHistory();
+  connectFallStream();
+  connectAlertStream();
+
+  window.__dashboard = { loadSummary, loadSymptoms, loadAlerts, showAlertBanner, get summaryStale() { return summaryStale; } };
+})();
