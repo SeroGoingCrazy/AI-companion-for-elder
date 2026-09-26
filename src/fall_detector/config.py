@@ -31,7 +31,7 @@ class RuleConfig(_Model):
     min_keypoint_conf: float = 0.3
     aspect_ratio_threshold: float = 1.2
     torso_angle_deg: float = 60
-    drop_ratio: float = 0.35
+    drop_ratio: float = 0.25
     drop_window_s: float = 0.6
     down_confirm_s: float = 3
     cooldown_s: float = 30
@@ -59,7 +59,7 @@ class FallConfig(_Model):
     model: str = "models/yolo11n-pose.pt"
     device: str = "cpu"
     vision_verify: bool = False
-    report_url: str = "http://localhost:8000/api/alerts"
+    report_url: str = "http://127.0.0.1:8000/api/alerts"
     rules: RuleConfig = RuleConfig()
     mcp: MCPConfig = MCPConfig()
 

@@ -39,7 +39,7 @@ fall:
   down_confirm_s: 3                              # on the floor this long => alert
   cooldown_s: 30                                 # no repeat alert for the same person
   vision_verify: false
-  report_url: ${FALL_REPORT_URL:-http://localhost:8000/api/alerts}
+  report_url: ${FALL_REPORT_URL:-http://127.0.0.1:8000/api/alerts}
   mcp:
     host: 127.0.0.1
     port: 8001
