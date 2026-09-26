@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib import PurePosixPath
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from elder_companion.db import UtcDateTime
 
 AlertType = Literal["symptom", "fall"]
 AlertLevel = Literal["high", "medium"]
@@ -48,5 +49,5 @@ class AlertOut(BaseModel):
     content: str
     snapshot_path: str | None
     ref_id: str | None
-    created_at: datetime
+    created_at: UtcDateTime
     is_read: bool

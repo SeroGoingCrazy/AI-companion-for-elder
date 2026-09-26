@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Annotated
 
+from pydantic import AfterValidator
 from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -19,6 +21,15 @@ class Base(DeclarativeBase):
 
 def utcnow() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
+
+
+def _as_utc(dt: datetime) -> datetime:
+    return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
+
+
+# For API schemas: DB values are naive UTC; without an offset in the JSON, browsers would
+# parse them as local time.
+UtcDateTime = Annotated[datetime, AfterValidator(_as_utc)]
 
 
 def resolve_sqlite_url(url: str) -> str:

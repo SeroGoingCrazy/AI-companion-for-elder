@@ -18,6 +18,19 @@ def create_alert(session: Session, data: AlertIn) -> Alert:
     return alert
 
 
+class AlertNotFound(LookupError):
+    pass
+
+
+def mark_read(session: Session, alert_id: int) -> Alert:
+    alert = session.get(Alert, alert_id)
+    if alert is None:
+        raise AlertNotFound(alert_id)
+    alert.is_read = True
+    session.commit()
+    return alert
+
+
 def list_alerts(session: Session, elder_id: int = DEFAULT_ELDER_ID, limit: int = 50) -> list[Alert]:
     stmt = (
         select(Alert)

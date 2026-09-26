@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sse_starlette import EventSourceResponse, ServerSentEvent
 
 from elder_companion.alerts.schemas import AlertIn, AlertOut
-from elder_companion.alerts.service import create_alert, list_alerts
+from elder_companion.alerts.service import AlertNotFound, create_alert, list_alerts, mark_read
 from elder_companion.elders import ElderNotFound
 from elder_companion.web.deps import AlertBusDep, SessionDep
 
@@ -30,6 +30,14 @@ def post_alert(body: AlertIn, session: SessionDep, bus: AlertBusDep) -> AlertOut
 @router.get("", response_model=list[AlertOut])
 def get_alerts(session: SessionDep, limit: int = Query(50, ge=1, le=200)) -> list[AlertOut]:
     return [AlertOut.model_validate(a) for a in list_alerts(session, limit=limit)]
+
+
+@router.post("/{alert_id}/read", response_model=AlertOut)
+def read_alert(alert_id: int, session: SessionDep) -> AlertOut:
+    try:
+        return AlertOut.model_validate(mark_read(session, alert_id))
+    except AlertNotFound as e:
+        raise HTTPException(status_code=404, detail=f"alert {alert_id} not found") from e
 
 
 @router.get("/stream", response_class=EventSourceResponse)
