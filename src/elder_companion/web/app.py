@@ -16,6 +16,7 @@ from elder_companion.db import init_db, make_engine, make_sessionmaker
 from elder_companion.llm import BaseLLMClient, get_llm
 from elder_companion.seed import seed_demo
 from elder_companion.settings import Settings, get_settings
+from elder_companion.summary import DailySummary
 from elder_companion.symptoms.extractor import SymptomExtractor
 from elder_companion.web.routes import alerts, chat, family, pages
 
@@ -36,6 +37,9 @@ def create_app(settings: Settings | None = None, llm: BaseLLMClient | None = Non
     app.state.llm = llm or get_llm(settings.llm)
     app.state.symptom_extractor = SymptomExtractor(app.state.llm)
     app.state.alert_bus = AlertBus()
+    app.state.daily_summary = DailySummary(
+        app.state.llm, companion_name=settings.chat.companion_name
+    )
 
     app.include_router(alerts.router)
     app.include_router(chat.router)

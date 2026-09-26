@@ -119,3 +119,25 @@ def get_messages(
     return [
         MessageOut.model_validate(m) for m in recent_messages(session, elder.id, limit, before_id)
     ]
+
+
+class SummaryOut(BaseModel):
+    summary: str
+    generated_at: UtcDateTime
+    fallback: bool
+    empty: bool
+
+
+@router.get("/summary/today", response_model=SummaryOut)
+def get_today_summary(
+    request: Request,
+    session: SessionDep,
+    refresh: bool = Query(False, description="regenerate even if the cached summary is current"),
+    elder_id: int | None = None,
+) -> SummaryOut:
+    """2-3 sentence summary of the elder's day; cached while nothing new has happened."""
+    elder = elder_or_404(session, elder_id)
+    r = request.app.state.daily_summary.get(session, elder.id, elder_now(request), refresh=refresh)
+    return SummaryOut(
+        summary=r.summary, generated_at=r.generated_at, fallback=r.fallback, empty=r.empty
+    )

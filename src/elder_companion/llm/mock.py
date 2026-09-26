@@ -51,6 +51,11 @@ class MockLLMClient(BaseLLMClient):
         # A conversation ending in a system instruction is a greeting request.
         if messages and messages[-1]["role"] == "system":
             return cfg.get("greet", "Hello! How are you today?")
+        # system_rules match the first system prompt (e.g. the daily summary's instructions).
+        system = messages[0]["content"] if messages and messages[0]["role"] == "system" else ""
+        rule = _match(system, cfg.get("system_rules", []))
+        if rule:
+            return rule["reply"]
         user_text = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
         rule = _match(user_text, cfg.get("rules", []))
         if rule:

@@ -8,7 +8,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from elder_companion.models import Message, SymptomLog
+from elder_companion.models import Alert, Message, SymptomLog
 
 
 def local_day_bounds(day: date, now: datetime) -> tuple[datetime, datetime]:
@@ -82,6 +82,16 @@ def messages_on(session: Session, elder_id: int, day: date, now: datetime) -> li
         select(Message)
         .where(Message.elder_id == elder_id, Message.created_at >= start, Message.created_at < end)
         .order_by(Message.id)
+    )
+    return list(session.scalars(stmt))
+
+
+def alerts_on(session: Session, elder_id: int, day: date, now: datetime) -> list[Alert]:
+    start, end = local_day_bounds(day, now)
+    stmt = (
+        select(Alert)
+        .where(Alert.elder_id == elder_id, Alert.created_at >= start, Alert.created_at < end)
+        .order_by(Alert.created_at)
     )
     return list(session.scalars(stmt))
 
