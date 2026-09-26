@@ -192,3 +192,9 @@ def test_openai_transcribe_and_tts() -> None:
     assert tts_body["model"] == "tts-m"
     assert tts_body["voice"] == "coral"
     assert tts_body["instructions"] == "slowly"
+
+
+def test_mock_tts_can_be_disabled() -> None:
+    m = MockLLMClient({**MOCK_CFG, "tts": {"available": False}})
+    with pytest.raises(LLMError, match="disabled"):
+        m.tts("hi")
