@@ -3,8 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#F6F3EE">
+  <meta name="theme-color" content="#F2F5F8">
   <title>{{ elder.nickname }}'s day</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;700;800&display=swap">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="family">
@@ -22,9 +25,20 @@
 
   <main class="dash">
     <header class="dash-header">
-      <div>
-        <h1>{{ elder.nickname }}'s day</h1>
-        <p class="dash-sub">{{ elder.name }} · chats with {{ companion_name }}</p>
+      <div class="dash-brand">
+        <svg class="avatar" viewBox="0 0 48 48" aria-hidden="true">
+          <circle cx="24" cy="24" r="11" />
+          <g stroke-width="3.5" stroke-linecap="round">
+            <line x1="24" y1="3" x2="24" y2="8" /><line x1="24" y1="40" x2="24" y2="45" />
+            <line x1="3" y1="24" x2="8" y2="24" /><line x1="40" y1="24" x2="45" y2="24" />
+            <line x1="9.2" y1="9.2" x2="12.7" y2="12.7" /><line x1="35.3" y1="35.3" x2="38.8" y2="38.8" />
+            <line x1="9.2" y1="38.8" x2="12.7" y2="35.3" /><line x1="35.3" y1="12.7" x2="38.8" y2="9.2" />
+          </g>
+        </svg>
+        <div>
+          <h1>{{ elder.nickname }}'s day</h1>
+          <p class="dash-sub">{{ elder.name }}, chatting with {{ companion_name }}</p>
+        </div>
       </div>
       <div class="dash-header-tools">
         <button id="sound-btn" type="button" class="btn btn-quiet" aria-pressed="false">🔕 Sound off</button>
@@ -62,7 +76,7 @@
 
     <section class="card symptoms-card" aria-labelledby="symptoms-h">
       <div class="card-head">
-        <h2 id="symptoms-h">Symptoms · last 7 days</h2>
+        <h2 id="symptoms-h">Symptoms, past 7 days</h2>
       </div>
       <div class="legend" aria-label="Legend">
         <span class="chip sev-red">Emergency sign</span>
