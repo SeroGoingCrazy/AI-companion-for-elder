@@ -33,6 +33,7 @@ class LLMSettings(_Model):
     chat_model: str
     extract_model: str
     asr_model: str
+    asr_prompt: str = ""  # biases transcription style, e.g. Simplified Chinese
     tts_model: str
     tts_voice: str
     tts_instructions: str

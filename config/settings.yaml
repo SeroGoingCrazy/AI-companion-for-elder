@@ -7,6 +7,10 @@ llm:
   chat_model: ${CHAT_MODEL:-gpt-4.1-mini}
   extract_model: ${EXTRACT_MODEL:-gpt-4.1-mini}
   asr_model: ${ASR_MODEL:-gpt-4o-transcribe}
+  # Without a hint, Mandarin is often transcribed in Traditional characters. Keep this a
+  # description nobody would say aloud: on near-silent clips the model can echo it back,
+  # and echoes are detected and discarded (see OpenAIClient.transcribe).
+  asr_prompt: "以下是一段简体中文或英文的日常聊天录音转写。Transcript of a casual chat in English or Simplified Chinese."
   tts_model: ${TTS_MODEL:-gpt-4o-mini-tts}
   tts_voice: ${TTS_VOICE:-coral}
   tts_instructions: "Speak slowly, warmly and clearly, like a caring family member."

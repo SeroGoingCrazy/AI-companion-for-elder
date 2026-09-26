@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -14,6 +15,16 @@ from elder_companion.settings import LLMSettings
 logger = logging.getLogger(__name__)
 
 ChatMessage = dict[str, str]  # {"role": "system" | "user" | "assistant", "content": ...}
+
+_NON_WORD = re.compile(r"[\W_]+")
+MIN_ECHO_CHARS = 6
+
+
+def is_prompt_echo(transcript: str, prompt: str) -> bool:
+    """True when a transcript is just (part of) the ASR prompt, which happens on silent clips."""
+    t = _NON_WORD.sub("", transcript.lower())
+    p = _NON_WORD.sub("", prompt.lower())
+    return len(t) >= MIN_ECHO_CHARS and t in p
 
 
 class LLMError(RuntimeError):
@@ -88,11 +99,17 @@ class OpenAIClient(BaseLLMClient):
         kwargs: dict[str, Any] = {"model": self._s.asr_model, "file": (filename, audio)}
         if language:
             kwargs["language"] = language
+        if self._s.asr_prompt:
+            kwargs["prompt"] = self._s.asr_prompt
         try:
             resp = self._client.audio.transcriptions.create(**kwargs)
         except openai.OpenAIError as e:
             raise LLMError(f"transcribe failed: {e}") from e
-        return (resp.text or "").strip()
+        text = (resp.text or "").strip()
+        if self._s.asr_prompt and is_prompt_echo(text, self._s.asr_prompt):
+            logger.info("discarding transcript that echoes the ASR prompt: %r", text)
+            return ""
+        return text
 
     def tts(self, text: str) -> bytes:
         try:
