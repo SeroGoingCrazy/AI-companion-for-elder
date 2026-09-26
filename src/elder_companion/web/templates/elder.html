@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#FFF8EE">
+  <title>{{ companion_name }}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="elder" data-state="idle">
+  <main class="elder-app">
+    <header class="elder-header">
+      <svg class="avatar" viewBox="0 0 48 48" aria-hidden="true">
+        <circle cx="24" cy="24" r="11" />
+        <g stroke-width="3.5" stroke-linecap="round">
+          <line x1="24" y1="3" x2="24" y2="8" /><line x1="24" y1="40" x2="24" y2="45" />
+          <line x1="3" y1="24" x2="8" y2="24" /><line x1="40" y1="24" x2="45" y2="24" />
+          <line x1="9.2" y1="9.2" x2="12.7" y2="12.7" /><line x1="35.3" y1="35.3" x2="38.8" y2="38.8" />
+          <line x1="9.2" y1="38.8" x2="12.7" y2="35.3" /><line x1="35.3" y1="12.7" x2="38.8" y2="9.2" />
+        </g>
+      </svg>
+      <div>
+        <h1>{{ companion_name }}</h1>
+        <p class="subtitle">Here for you, {{ nickname }}</p>
+      </div>
+    </header>
+
+    <section id="start-screen" class="start">
+      <p class="start-greeting">Hello, {{ nickname }}!</p>
+      <button id="start-btn" class="start-btn" type="button">Start chatting</button>
+    </section>
+
+    <section id="chat-screen" class="chat" hidden>
+      <div id="conversation" class="conversation" aria-live="polite"></div>
+
+      <p id="status" class="status" role="status"></p>
+
+      <button id="mic-btn" class="mic" type="button" aria-label="Hold to talk" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="9" y="2.5" width="6" height="12" rx="3" />
+          <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" fill="none" stroke-width="2" stroke-linecap="round" />
+        </svg>
+      </button>
+
+      <details class="type-instead">
+        <summary>Type instead</summary>
+        <form id="text-form" class="text-form" autocomplete="off">
+          <label for="text-input" class="visually-hidden">Your message</label>
+          <input id="text-input" type="text" maxlength="2000" placeholder="Type a message…">
+          <button type="submit">Send</button>
+        </form>
+      </details>
+    </section>
+
+    <footer class="disclaimer">{{ companion_name }} is an AI companion, not a medical service. In an emergency, call 911.</footer>
+  </main>
+
+  <script>window.APP_CONFIG = {{ app_config | tojson }};</script>
+  <script src="/static/elder.js" defer></script>
+</body>
+</html>

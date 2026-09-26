@@ -8,13 +8,14 @@ from __future__ import annotations
 
 import uvicorn
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from elder_companion import __version__
 from elder_companion.db import init_db, make_engine, make_sessionmaker
 from elder_companion.llm import BaseLLMClient, get_llm
 from elder_companion.seed import seed_demo
 from elder_companion.settings import Settings, get_settings
-from elder_companion.web.routes import alerts, chat
+from elder_companion.web.routes import alerts, chat, pages
 
 
 def create_app(settings: Settings | None = None, llm: BaseLLMClient | None = None) -> FastAPI:
@@ -35,6 +36,8 @@ def create_app(settings: Settings | None = None, llm: BaseLLMClient | None = Non
     app.include_router(alerts.router)
     app.include_router(chat.router)
     app.include_router(chat.tts_router)
+    app.include_router(pages.router)
+    app.mount("/static", StaticFiles(directory=pages.WEB_DIR / "static"), name="static")
 
     @app.get("/healthz", tags=["meta"])
     def healthz() -> dict[str, str]:
