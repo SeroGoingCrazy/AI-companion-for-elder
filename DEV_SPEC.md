@@ -424,7 +424,7 @@ AI-for-elder/
 │   │   ├── prompts.py            # load/render config/prompts/*.txt (string.Template)
 │   │   ├── llm/{client.py, mock.py, __main__.py}
 │   │   ├── chat/{service.py, context.py}
-│   │   ├── symptoms/{schema.py, extractor.py, merge.py, rules.py}
+│   │   ├── symptoms/{schema.py, extractor.py, merge.py, rules.py, service.py}
 │   │   ├── alerts/{service.py, bus.py}
 │   │   ├── summary.py
 │   │   └── web/
@@ -574,14 +574,14 @@ fall:
 | A | A1 A2 A3 | ✅✅✅ |
 | B | B1 B2 B3 | ✅✅✅ |
 | C | C1 C2 C3 | ✅✅✅ |
-| D | D1 D2 D3 D4 | ⬜⬜⬜⬜ |
+| D | D1 D2 D3 D4 | ✅✅✅✅ |
 | E | E1 E2 E3 E4 E5* | ⬜⬜⬜⬜⬜ |
 | F | F1 F2 F3 F4 F5 F6 F7 F8 F9* | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ |
 | G | G1 G2 G3 G4 | ⬜⬜⬜⬜ |
 
 ### 📈 Overall Progress
 
-`9 / 31` (* = optional task, not required for delivery)
+`13 / 31` (* = optional task, not required for delivery)
 
 ---
 
@@ -671,34 +671,37 @@ fall:
 
 ## Stage D: Symptom Log (goal: M1 — say one sentence, the symptom appears on the dashboard)
 
-### D1: Symptom enum and schema
+### D1: Symptom enum and schema ✅
 - **Owner**: A
 - **Goal**: `config/symptoms.yaml` (canonical names, English/Chinese display names, alert levels); Pydantic `SymptomItem` / `SymptomExtraction`, exporting a JSON Schema for Structured Outputs, with the `canonical` enum generated from the yaml.
 - **Files**: `config/symptoms.yaml`, `symptoms/schema.py`, `tests/unit/test_symptom_schema.py`.
 - **Acceptance**: canonical values outside the enum fail validation; the exported schema meets strict-mode requirements (all fields required, `additionalProperties: false`).
 - **How to test**: `uv run pytest -q tests/unit/test_symptom_schema.py`.
 
-### D2: Extractor
+### D2: Extractor ✅
 - **Owner**: A
 - **Goal**: `extract_symptoms.txt` (enum list, don't record negations/other people, `raw_quote` must be verbatim, return empty when there are no symptoms, 5 few-shot examples); `SymptomExtractor.extract(user_text, recent_turns)`; `raw_quote` substring check.
 - **Files**: `config/prompts/extract_symptoms.txt`, `symptoms/extractor.py`, `eval/extraction_cases.yaml`, `eval/run_extraction_eval.py`.
 - **Classes/functions**: `SymptomExtractor`, `verify_quote(item, text) -> bool`.
 - **Acceptance**: L2 eval accuracy ≥ 90%, red-flag recall 100%.
 - **How to test**: `uv run python eval/run_extraction_eval.py` (needs a key; prints per-case results and a summary).
+- **Measured (gpt-4.1-mini, 30 cases, 3 runs)**: 30/30 every run, red-flag recall 10/10, no false red flags. The recent turns go in the user message right before the utterance: at the end of the system prompt, follow-ups like "Much better today" (about the knee) were missed and accuracy sat at 90%. Cases may list `optional` canonicals for genuinely ambiguous wording (e.g. "leg hurts" after a fall).
 
-### D3: Merge and alert rules
+### D3: Merge and alert rules ✅
 - **Owner**: A
 - **Goal**: implement the merging, alert levels, and 2h debounce from 3.4.3; prefer pure functions and keep DB operations in the service.
 - **Files**: `symptoms/merge.py`, `symptoms/rules.py`, `alerts/service.py`, `tests/unit/test_symptom_merge.py`, `tests/unit/test_alert_rules.py`.
-- **Classes/functions**: `merge_symptom(existing, item, now) -> MergeResult`, `alert_level(canonical, severity) -> Level | None`, `should_alert(last_alert_at, now)`.
+- **Classes/functions**: `merge_symptom(existing, item, now) -> MergeResult`, `alert_level(canonical, severity, status) -> Level | None`, `should_alert(last_alert_at, now)`; `alerts.service.last_symptom_alert_at()` (symptom alerts keep the `symptom_log` id in `ref_id`; debounce is per canonical).
+- **Decisions**: a repeat mention within the window turns `new` into `ongoing`; red flags alert even when `resolved` ("I fell but I'm fine" still goes to family); severe ordinary symptoms stop alerting once `resolved`.
 - **Acceptance**: table-driven cases cover: new insert, merge within 24h, new row outside the window, severity takes the max, `other` merges by label, red flags → high, severe ordinary symptoms → medium, debounce works.
 - **How to test**: `uv run pytest -q tests/unit/test_symptom_merge.py tests/unit/test_alert_rules.py`.
 
-### D4: Wire into the chat flow and broadcast alerts
+### D4: Wire into the chat flow and broadcast alerts ✅
 - **Owner**: A
 - **Goal**: after `/api/chat` completes, `BackgroundTasks` runs extract → merge → alert; `alerts.bus` broadcasts in-process (a list of `asyncio.Queue` subscribers); `GET /api/alerts/stream` emits SSE.
 - **Files**: `chat/service.py`, `web/routes/chat.py`, `alerts/bus.py`, `web/routes/alerts.py`, `tests/integration/test_symptom_pipeline.py`.
-- **Classes/functions**: `process_message_symptoms(message_id)`, `AlertBus.publish()`, `AlertBus.subscribe()`.
+- **Classes/functions**: `process_message_symptoms(message_id)`, `AlertBus.publish()`, `AlertBus.subscribe()`; `SymptomService.process_message()` (`symptoms/service.py`).
+- **Measured (real API)**: chat replies in 1.0–1.3s with extraction running afterwards; "这两天早上起来头有点晕" logs `dizziness` (mild, 2 days); "My chest feels tight and I can't catch my breath" pushes two high alerts (Chest pain, Shortness of breath) to `curl -N /api/alerts/stream`. Each red-flag symptom is its own alert, so one sentence can raise two.
 - **Acceptance**: **M1** — saying "这两天早上起来头有点晕" ("I've been a bit dizzy in the mornings these past two days") → `dizziness` appears in `symptom_log`; saying "胸口闷，喘不上气" ("my chest feels tight, I can't catch my breath") → an SSE client (`curl -N`) receives a high alert; chat latency is unaffected.
 - **How to test**: `uv run pytest -q tests/integration/test_symptom_pipeline.py` (mock); manual end-to-end with the real API.
 
