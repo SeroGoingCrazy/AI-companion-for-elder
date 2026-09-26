@@ -69,3 +69,12 @@ def test_tts_rejects_user_and_unknown_messages(client: TestClient) -> None:
     user_mid = mid - 1
     assert client.get(f"/api/tts/{user_mid}").status_code == 404
     assert client.get("/api/tts/9999").status_code == 404
+
+
+def test_tts_response_revalidates_instead_of_caching(client: TestClient) -> None:
+    mid = _assistant_id(client)
+    r = client.get(f"/api/tts/{mid}")
+    assert r.headers["cache-control"] == "no-cache"
+    assert r.headers.get("etag")
+    again = client.get(f"/api/tts/{mid}", headers={"if-none-match": r.headers["etag"]})
+    assert again.status_code == 304
