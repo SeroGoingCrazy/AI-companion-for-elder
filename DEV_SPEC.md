@@ -92,7 +92,7 @@ The elder never has to "fill out a health form". When the agent hears something 
 | Voice round-trip end-to-end latency P50 | < 4s | – |
 | Symptom-extraction eval accuracy (symptom name + red-flag) | ≥ 90% | – |
 | Red-flag recall (eval set) | 100% | – |
-| Demo-video fall detections / false positives | all detected / 0 false positives | – |
+| Demo-video fall detections / false positives | all detected / 0 false positives | demo clips: 2/2 main falls, 0/4 FP; all 17 URFD clips: 4/5 falls, 0/12 FP |
 
 ---
 
@@ -230,16 +230,19 @@ for s in extraction.symptoms:
 **Detection state machine** (one instance per tracked person; parameters in `settings.yaml`)
 
 ```
-STANDING ──(A: bbox aspect ratio > 1.2  or  torso angle from vertical > 60°)──▶ candidate
-        and (B: hip midpoint drops > 0.35 × body height within ≤ 0.6s)    ──▶ FALLING
+STANDING ──(A: bbox aspect ratio > 1.2  or  torso angle from vertical > 60° with aspect > 0.8)──▶ candidate
+        and (B: hip midpoint drops > 0.25 × standing height within ≤ 0.6s)                  ──▶ FALLING
+STANDING ──(A without B: horizontal, slow)──▶ LYING (never alerts; LYING ──B──▶ FALLING)
 FALLING ──(stays near-horizontal ≥ 3s and hip displacement < threshold)──▶ DOWN ⇒ fire alert (snapshot)
-FALLING ──(back upright within 3s)──▶ STANDING (no alert)
+FALLING ──(back upright ≥ 0.5s within 3s)──▶ STANDING (no alert)
 DOWN    ──(back upright)──▶ STANDING; no repeat alert for the same track within 30s
 ```
 
+- **Tuned on real clips (Stage F)**: `drop_ratio` 0.35 → 0.25 (a person close to the camera has a bbox cut off by the frame edge, inflating "standing height"); LYING → FALLING added (falls that pitch forward read horizontal before the hips drop); a new track id adopts the history of a person who vanished at the same spot within 1.5s (ByteTrack often re-ids a falling body); untracked one-off boxes are ignored.
+
 - Slowly lying down fails condition B (fall speed) → no alert. This is the core of distinguishing "lying down" from "falling".
 - Frames with keypoint confidence < 0.3 are skipped; person boxes get a track_id from `model.track(persist=True)`.
-- Performance: YOLO11n-pose runs at ~15–25 FPS on a laptop CPU (640 input), enough for the demo; processing every 2nd frame is the fallback.
+- Performance: measured ~50 FPS offline / 32 FPS live (with annotation + JPEG) for YOLO11n-pose on a laptop CPU at 640 input; Apple Silicon can use `FALL_DEVICE=mps`.
 - Privacy: video frames are processed locally and never uploaded; only a single snapshot is uploaded, and only when the second check is enabled.
 
 ### 3.6 Technical Analysis: fall-mcp Service Design
@@ -525,7 +528,7 @@ symptoms:
 fall:
   aspect_ratio_threshold: 1.2
   torso_angle_deg: 60
-  drop_ratio: 0.35
+  drop_ratio: 0.25
   drop_window_s: 0.6
   down_confirm_s: 3
   cooldown_s: 30
@@ -576,12 +579,12 @@ fall:
 | C | C1 C2 C3 | ✅✅✅ |
 | D | D1 D2 D3 D4 | ✅✅✅✅ |
 | E | E1 E2 E3 E4 E5* | ✅✅✅✅⬜ |
-| F | F1 F2 F3 F4 F5 F6 F7 F8 F9* | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ |
+| F | F1 F2 F3 F4 F5 F6 F7 F8 F9* | ✅✅✅✅✅✅✅✅⬜ |
 | G | G1 G2 G3 G4 | ✅⬜⬜⬜ |
 
 ### 📈 Overall Progress
 
-`18 / 31` (* = optional task, not required for delivery)
+`26 / 31` (* = optional task, not required for delivery)
 
 ---
 
@@ -755,21 +758,21 @@ fall:
 
 ## Stage F: Fall Detection fall-mcp (goal: M2 — play a video, the dashboard shows a fall alert; M3 — tools exposed over MCP)
 
-### F1: Environment setup and pose running
+### F1: Environment setup and pose running ✅
 - **Owner**: B
 - **Goal**: install the `vision` extra; `pose.py` wraps `YOLO("yolo11n-pose.pt").track(frame, persist=True)` and outputs `list[PersonPose(track_id, bbox, keypoints[17,3])]`; a visualization script draws skeletons.
 - **Files**: `src/fall_detector/pose.py`, `src/fall_detector/__main__.py`.
 - **Acceptance**: `python -m fall_detector --source demo/videos/walk.mp4 --show` displays skeletons and track_ids in a window at FPS ≥ 12.
 - **How to test**: manual; FPS printed to the terminal.
 
-### F2: Demo video footage
+### F2: Demo video footage ✅
 - **Owner**: B
 - **Goal**: record/collect ≥ 3 clips: normal walking, slowly lying down on a sofa (should not alert), a fall (should alert); fixed camera position (simulating a living-room camera height). Clips from the Le2i / UR Fall public datasets may supplement these (mind the licenses).
 - **Files**: `demo/videos/*.mp4`, `demo/videos/README.md` (sources and expected results).
 - **Acceptance**: every clip is labeled with its expected result.
 - **How to test**: manual review.
 
-### F3: Feature computation
+### F3: Feature computation ✅
 - **Owner**: B
 - **Goal**: compute from keypoints: bbox aspect ratio, torso angle (shoulder midpoint–hip midpoint vs. vertical), hip-midpoint height (normalized to body height), fall speed; handle low-confidence keypoints.
 - **Files**: `src/fall_detector/rules.py`, `tests/unit/test_fall_features.py`.
@@ -777,7 +780,7 @@ fall:
 - **Acceptance**: synthetic "upright" and "horizontal" keypoints produce the expected angles and aspect ratios.
 - **How to test**: `uv run pytest -q tests/unit/test_fall_features.py`.
 
-### F4: Fall state machine
+### F4: Fall state machine ✅
 - **Owner**: B
 - **Goal**: implement the state machine from 3.5 (parameters from settings), one instance per track, no repeat alerts during cooldown.
 - **Files**: `src/fall_detector/rules.py`, `tests/unit/test_fall_state_machine.py`, `tests/fixtures/pose_sequences/*.json`.
@@ -785,7 +788,7 @@ fall:
 - **Acceptance**: synthetic sequences: fast fall then staying down 3s → exactly 1 alert; slowly lying down → none; down for 1s then getting up → none; staying down for 60s → only 1 alert within the cooldown. Results on the three demo videos match their labels.
 - **How to test**: `uv run pytest -q tests/unit/test_fall_state_machine.py`; `python -m fall_detector --source demo/videos/fall_01.mp4 --dry-run`.
 
-### F5: Event store, snapshots, and reporting
+### F5: Event store, snapshots, and reporting ✅
 - **Owner**: B
 - **Goal**: `EventStore` appends to `data/fall_events.jsonl` (`event_id, ts, track_id, confidence, source[live|offline], verified, snapshot_id`) and maintains an in-memory index; on an event, save a snapshot with the skeleton overlay; `live` events call `POST /api/alerts` (`ref_id=event_id`); if the main service is unreachable, log locally and retry 3 times without blocking the detection thread.
 - **Files**: `src/fall_detector/events.py`, `src/fall_detector/reporter.py`, `tests/unit/test_event_store.py`, `tests/unit/test_reporter.py`.
@@ -793,7 +796,7 @@ fall:
 - **Acceptance**: past events are still queryable after a process restart; with the main service running, playing the fall video → a fall row appears in the `alert` table and the dashboard receives it over SSE.
 - **How to test**: `uv run pytest -q tests/unit/test_event_store.py tests/unit/test_reporter.py` (`httpx.MockTransport`); integration run.
 
-### F6: MonitorController and service assembly (MJPEG)
+### F6: MonitorController and service assembly (MJPEG) ✅
 - **Owner**: B
 - **Goal**: `MonitorController` manages the background detection thread (`start(source, loop)` / `stop()` / `status()` / `latest_frame()`, thread-safe, stop-then-start when switching sources); `server.py` assembles the Starlette app: `/stream` (MJPEG with skeletons and STANDING / FALLING / DOWN status text; video files loop when finished) and `/healthz`; monitoring starts automatically from `autostart_source` on launch.
 - **Files**: `src/fall_detector/monitor.py`, `src/fall_detector/stream.py`, `src/fall_detector/server.py`, `tests/unit/test_monitor.py`.
@@ -801,7 +804,7 @@ fall:
 - **Acceptance**: **M2** — after `uv run python -m fall_detector.server` starts, the dashboard panel shows the live detection view; when the fall video plays, the dashboard pops up a fall alert + snapshot.
 - **How to test**: `uv run pytest -q tests/unit/test_monitor.py` (with a fake pose source); manual integration.
 
-### F7: fall-mcp tools
+### F7: fall-mcp tools ✅
 - **Owner**: B
 - **Goal**: implement the 6 tools from 3.6 + the `fall://live/snapshot` resource with FastMCP, mounted at `/mcp` in `server.py` (Streamable HTTP); `--stdio` mode runs MCP only (no MJPEG); parameter schemas generated from type annotations; errors mapped to readable `isError=true` results; `get_event_snapshot` returns `ImageContent`.
 - **Files**: `src/fall_detector/mcp_tools.py`, `src/fall_detector/server.py`, `tests/integration/test_fall_mcp.py`.
@@ -809,12 +812,13 @@ fall:
 - **Acceptance**: MCP Inspector (`npx @modelcontextprotocol/inspector`) connected to `http://127.0.0.1:8001/mcp` can list and call every tool; `analyze_video(demo/videos/fall_01.mp4)` returns ≥ 1 event and `analyze_video(demo/videos/lie_down.mp4)` returns 0; a nonexistent path returns a tool error instead of crashing.
 - **How to test**: `uv run pytest -q tests/integration/test_fall_mcp.py` (MCP SDK in-process client + fake pose source); manual verification in the Inspector.
 
-### F8: Claude Desktop integration
+### F8: Claude Desktop integration ✅
 - **Owner**: B
 - **Goal**: write `docs/mcp_desktop.md` (a stdio config example for `claude_desktop_config.json`, including the absolute path for `uv run --directory`); in Claude Desktop, ask "Were any falls detected today? Show me the snapshot" and complete the tool calls.
 - **Files**: `docs/mcp_desktop.md`.
 - **Acceptance**: Claude Desktop lists the fall-mcp tools and returns events and snapshots.
 - **How to test**: manual; record the screen as bonus demo material.
+- **Status**: stdio verified with the MCP SDK client (6 tools, events + snapshot image from the shared store); asking inside Claude Desktop itself is still a manual check for rehearsal.
 
 ### F9 (optional): Second check with a vision model
 - **Owner**: B
@@ -913,3 +917,5 @@ fall:
 | 12 | Demo relies mainly on pre-recorded video + seeded history, with a mock fallback | Everything live on site | Reproducible demo; avoids failures from network or lighting |
 | 13 | fall-mcp serves `/mcp` + `/stream` + `/healthz` from one Starlette process; stdio mode for desktop clients | MJPEG and MCP in two processes | Shares one MonitorController and latest frame; avoids cross-process sync |
 | 14 | fall-mcp is the single source of truth for fall events; the main service's alert table only stores alert copies (`ref_id`) | Main service stores all events | Offline-analysis events create no alerts but remain queryable; clear separation of responsibilities |
+| 15 | Demo footage = UR Fall Detection Dataset clips (RGB half, 2x, last frame held 4s), rebuilt by `scripts/fetch_demo_media.py`, not committed | Self-recorded clips; Le2i (sign-up required) | Public, CC BY-NC-SA 4.0, fixed indoor camera like the target setup; clips stay out of git but anyone can rebuild them |
+| 16 | fall-mcp uses mcp 2.x `MCPServer` (FastMCP renamed) | Pin `mcp<2` | The installed SDK is 2.x; in-process `Client(server)` makes tool tests cheap |
