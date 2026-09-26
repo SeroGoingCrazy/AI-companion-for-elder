@@ -93,3 +93,16 @@ def test_mark_alert_read(client: TestClient) -> None:
     assert r.status_code == 200 and r.json()["is_read"] is True
     assert client.get("/api/alerts").json()[0]["is_read"] is True
     assert client.post("/api/alerts/999/read").status_code == 404
+
+
+def test_today_summary(client: TestClient) -> None:
+    empty = client.get("/api/summary/today").json()
+    assert empty["empty"] is True and empty["summary"] == "No conversations yet today."
+    client.post("/api/chat", json={"text": "I watered the roses"})
+    body = client.get("/api/summary/today").json()
+    assert set(body) == {"summary", "generated_at", "fallback", "empty"}
+    assert body["empty"] is False and body["summary"].startswith("Maggie")
+    again = client.get("/api/summary/today").json()
+    assert again["generated_at"] == body["generated_at"]  # cached
+    refreshed = client.get("/api/summary/today?refresh=true").json()
+    assert refreshed["generated_at"] != body["generated_at"]
