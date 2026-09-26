@@ -1,0 +1,84 @@
+# L2 extraction eval (DEV_SPEC 4.2). Scoring: the set of canonicals (see run_extraction_eval.py).
+# Acceptance: accuracy >= 90%, red-flag recall 100%.
+#   say:     the elder's current utterance
+#   context: optional earlier turns, oldest first, as [role, text] (role: user | assistant)
+#   expect:  canonicals that must be extracted (order does not matter)
+#   optional: canonicals that are acceptable but not required (genuinely ambiguous wording)
+
+# --- demo script lines ---
+- say: "Much better today, but I didn't sleep well last night."
+  context:
+    - [assistant, "Good morning, Maggie! How is that knee feeling today?"]
+  expect: [joint_pain, insomnia]
+- say: "这两天早上起来头有点晕"
+  expect: [dizziness]
+- say: "My chest feels tight and I can't catch my breath"
+  expect: [chest_pain, shortness_of_breath]
+- say: "胸口闷，喘不上气"
+  expect: [chest_pain, shortness_of_breath]
+
+# --- ordinary symptoms ---
+- say: "I've been a bit dizzy in the mornings for two days"
+  expect: [dizziness]
+- say: "我今天挺好的，就是没什么胃口"
+  expect: [appetite_loss]
+- say: "My knee is acting up again, it's this cold weather."
+  expect: [joint_pain]
+- say: "I've had a bit of a cough since the weekend."
+  expect: [cough]
+- say: "昨晚又失眠了，翻来覆去睡不着"
+  expect: [insomnia]
+- say: "My lower back has been killing me since I did the gardening."
+  expect: [back_pain]
+- say: "I keep forgetting whether I took my blood pressure pill."
+  expect: [memory_issue]
+- say: "It's been so quiet since Emily left, I feel pretty lonely."
+  expect: [loneliness]
+- say: "有点头疼，还有点恶心"
+  expect: [headache, nausea]
+- say: "I feel so tired all the time lately, no energy at all."
+  expect: [fatigue]
+- say: "My right hand has a rash that itches."
+  expect: [other]
+
+# --- red flags ---
+- say: "I slipped in the bathroom this morning and hit the floor."
+  expect: [fall]
+- say: "我刚才在厨房摔了一跤，腿有点疼"
+  expect: [fall]
+  optional: [joint_pain, other]   # "leg hurts" after a fall
+- say: "My left arm suddenly went numb and weak."
+  expect: [numbness_weakness]
+- say: "Sometimes I think everyone would be better off without me."
+  expect: [self_harm]
+- say: "我觉得脑子糊涂了，不知道自己在哪儿"
+  expect: [confusion]
+- say: "My words are coming out all jumbled, I can't talk right."
+  expect: [slurred_speech]
+
+# --- no symptom / negation / other people ---
+- say: "My husband has a bad cough, I'm fine though"
+  expect: []
+- say: "I didn't have a headache today"
+  expect: []
+- say: "I watered the roses and called Leo, he's doing great at school."
+  expect: []
+- say: "今天天气真好，我去公园走了走"
+  expect: []
+- say: "我邻居老王最近老是头晕"
+  expect: []
+- say: "What should I cook for dinner tonight?"
+  expect: []
+- say: "If it gets cold I might get a cough, so I'll wear a scarf."
+  expect: []
+
+# --- follow-ups that need the recent conversation ---
+- say: "Still the same, it's worse when I stand up."
+  context:
+    - [user, "I've been a bit dizzy in the mornings."]
+    - [assistant, "I'm sorry to hear that. Is it better or worse today?"]
+  expect: [dizziness]
+- say: "好多了，已经不疼了"
+  context:
+    - [assistant, "膝盖今天怎么样了？"]
+  expect: [joint_pain]
