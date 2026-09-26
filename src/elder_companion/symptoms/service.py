@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from elder_companion.alerts.bus import AlertBus
+from elder_companion.alerts.bus import AlertBus, StreamEvent
 from elder_companion.alerts.schemas import AlertIn, AlertLevel, AlertOut
 from elder_companion.alerts.service import last_symptom_alert_at
 from elder_companion.db import utcnow
@@ -44,6 +45,12 @@ def alert_text(
     return title, content
 
 
+@dataclass
+class ProcessResult:
+    symptoms: list[SymptomLog] = field(default_factory=list)  # rows inserted or updated
+    alerts: list[Alert] = field(default_factory=list)
+
+
 class SymptomService:
     def __init__(
         self,
@@ -60,27 +67,28 @@ class SymptomService:
         self._debounce = timedelta(hours=settings.alert_debounce_hours)
         self._now = now
 
-    def process_message(self, message_id: int) -> list[Alert]:
-        """Log the symptoms in one elder message; return the alerts it raised.
+    def process_message(self, message_id: int) -> ProcessResult:
+        """Log the symptoms in one elder message and raise any alerts they call for.
         Raises LLMError if extraction fails (nothing is written then)."""
+        result = ProcessResult()
         msg = self._session.get(Message, message_id)
         if msg is None or msg.role != "user":
-            return []
+            return result
         items = self._extractor.extract(msg.text, self._recent_turns(msg))
         if not items:
-            return []
+            return result
         elder = self._session.get_one(Elder, msg.elder_id)
         now = self._now()
-        alerts = []
         for item in items:
             row = self._merge(msg, item, now)
+            result.symptoms.append(row)
             level = alert_level(item.canonical, item.severity, item.status, self._catalog)
             if level and should_alert(
                 last_symptom_alert_at(self._session, elder.id, item.canonical), now, self._debounce
             ):
-                alerts.append(self._alert(elder, msg, item, row, level, now))
+                result.alerts.append(self._alert(elder, msg, item, row, level, now))
         self._session.commit()
-        return alerts
+        return result
 
     def _recent_turns(self, msg: Message) -> list[ChatMessage]:
         stmt = (
@@ -137,18 +145,22 @@ def process_message_symptoms(
     bus: AlertBus | None,
     message_id: int,
 ) -> list[AlertOut]:
-    """Background task after a chat turn. Never raises: a failure here must not affect chat."""
+    """Background task after a chat turn. Never raises: a failure here must not affect chat.
+    Publishes each new alert, then an `activity` event (also after a failed extraction: the
+    message itself is new for the dashboard's history)."""
+    outs: list[AlertOut] = []
+    symptoms = 0
     try:
         with session_factory() as session:
-            alerts = SymptomService(session, extractor, settings).process_message(message_id)
-            outs = [AlertOut.model_validate(a) for a in alerts]
+            result = SymptomService(session, extractor, settings).process_message(message_id)
+            outs = [AlertOut.model_validate(a) for a in result.alerts]
+            symptoms = len(result.symptoms)
     except LLMError:
         logger.warning("symptom extraction failed for message %s", message_id, exc_info=True)
-        return []
     except Exception:
         logger.exception("symptom pipeline crashed for message %s", message_id)
-        return []
     if bus is not None:
         for out in outs:
-            bus.publish(out)
+            bus.publish(StreamEvent.alert(out))
+        bus.publish(StreamEvent.activity(message_id, symptoms))
     return outs

@@ -8,13 +8,35 @@ event loop with call_soon_threadsafe instead of touching the queues directly.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import Any
 
+from elder_companion.alerts.schemas import AlertOut
+
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class StreamEvent:
+    """One server-sent event for the dashboard."""
+
+    event: str  # "alert" (data: AlertOut) or "activity" (data: {"message_id", "symptoms"})
+    data: str  # JSON
+    id: str | None = None
+
+    @classmethod
+    def alert(cls, alert: AlertOut) -> StreamEvent:
+        return cls("alert", alert.model_dump_json(), str(alert.id))
+
+    @classmethod
+    def activity(cls, message_id: int, symptoms: int) -> StreamEvent:
+        """The elder said something (and `symptoms` were logged): time to reload the timeline."""
+        return cls("activity", json.dumps({"message_id": message_id, "symptoms": symptoms}))
 
 
 def _put(queue: asyncio.Queue[Any], item: Any) -> None:

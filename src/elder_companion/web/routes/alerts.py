@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 from fastapi import APIRouter, HTTPException, Query, status
 from sse_starlette import EventSourceResponse, ServerSentEvent
 
+from elder_companion.alerts.bus import StreamEvent
 from elder_companion.alerts.schemas import AlertIn, AlertOut
 from elder_companion.alerts.service import AlertNotFound, create_alert, list_alerts, mark_read
 from elder_companion.elders import ElderNotFound
@@ -23,7 +24,7 @@ def post_alert(body: AlertIn, session: SessionDep, bus: AlertBusDep) -> AlertOut
     except ElderNotFound as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     out = AlertOut.model_validate(alert)
-    bus.publish(out)
+    bus.publish(StreamEvent.alert(out))
     return out
 
 
@@ -42,13 +43,14 @@ def read_alert(alert_id: int, session: SessionDep) -> AlertOut:
 
 @router.get("/stream", response_class=EventSourceResponse)
 async def stream_alerts(bus: AlertBusDep) -> EventSourceResponse:
-    """SSE: `event: alert`, `data: <AlertOut JSON>` for every new alert (no replay of old ones;
-    the dashboard loads GET /api/alerts first)."""
+    """SSE for the dashboard, no replay (it loads GET /api/alerts first):
+    `event: alert` + AlertOut JSON for every new alert; `event: activity` after each elder
+    turn has been processed, so the timeline and history can reload."""
 
     async def events() -> AsyncIterator[ServerSentEvent]:
         with bus.subscribe() as queue:
             while True:
-                alert: AlertOut = await queue.get()
-                yield ServerSentEvent(data=alert.model_dump_json(), event="alert", id=str(alert.id))
+                ev: StreamEvent = await queue.get()
+                yield ServerSentEvent(data=ev.data, event=ev.event, id=ev.id)
 
     return EventSourceResponse(events(), ping=SSE_PING_SECONDS)
