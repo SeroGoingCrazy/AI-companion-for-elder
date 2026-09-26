@@ -198,3 +198,50 @@ def test_mock_tts_can_be_disabled() -> None:
     m = MockLLMClient({**MOCK_CFG, "tts": {"available": False}})
     with pytest.raises(LLMError, match="disabled"):
         m.tts("hi")
+
+
+ASR_HINT = "以下是一段简体中文或英文的日常聊天录音转写。Transcript of a casual chat."
+
+
+def _asr_client(text: str):
+    sdk = openai.OpenAI(
+        api_key="test-key",
+        base_url="https://fake.test/v1",
+        max_retries=0,
+        http_client=httpx.Client(
+            transport=httpx.MockTransport(lambda r: httpx.Response(200, json={"text": text}))
+        ),
+    )
+    return OpenAIClient(_llm_settings(asr_prompt=ASR_HINT), client=sdk)
+
+
+def test_transcribe_sends_asr_prompt() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(r: httpx.Request) -> httpx.Response:
+        seen.append(r)
+        return httpx.Response(200, json={"text": "你好"})
+
+    sdk = openai.OpenAI(
+        api_key="k",
+        base_url="https://fake.test/v1",
+        max_retries=0,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    client = OpenAIClient(_llm_settings(asr_prompt=ASR_HINT), client=sdk)
+    assert client.transcribe(b"audio", filename="a.webm") == "你好"
+    assert ASR_HINT.encode() in seen[0].content  # multipart form field "prompt"
+
+
+@pytest.mark.parametrize(
+    ("transcript", "kept"),
+    [
+        ("以下是一段简体中文或英文的日常聊天录音转写。", ""),  # full echo
+        ("Transcript of a casual chat", ""),  # partial echo
+        ("你好", "你好"),  # short real speech that happens to overlap
+        ("我今天挺好的", "我今天挺好的"),
+        ("Good morning, I slept okay.", "Good morning, I slept okay."),
+    ],
+)
+def test_transcribe_discards_prompt_echo(transcript: str, kept: str) -> None:
+    assert _asr_client(transcript).transcribe(b"audio", filename="a.webm") == kept
