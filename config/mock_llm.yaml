@@ -3,7 +3,7 @@
 # Keep the demo-script lines (DEV_SPEC "Demo Script") covered here so the demo can replay offline.
 
 chat:
-  greet: "Good morning, Maggie! How did you sleep last night? And how is that knee feeling today?"
+  greet: "Good morning, Maggie! How is that knee feeling today?"   # one question: tidy_reply keeps only the first
   default: "That's lovely to hear, Maggie. Tell me a little more?"
   default_zh: "嗯嗯，我在听呢。能再多跟我说说吗？"
   # Matched against the system prompt, before `rules`.
