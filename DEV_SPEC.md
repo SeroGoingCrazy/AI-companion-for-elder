@@ -577,11 +577,11 @@ fall:
 | D | D1 D2 D3 D4 | ✅✅✅✅ |
 | E | E1 E2 E3 E4 E5* | ✅✅✅✅⬜ |
 | F | F1 F2 F3 F4 F5 F6 F7 F8 F9* | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ |
-| G | G1 G2 G3 G4 | ⬜⬜⬜⬜ |
+| G | G1 G2 G3 G4 | ✅⬜⬜⬜ |
 
 ### 📈 Overall Progress
 
-`17 / 31` (* = optional task, not required for delivery)
+`18 / 31` (* = optional task, not required for delivery)
 
 ---
 
@@ -827,7 +827,7 @@ fall:
 
 ## Stage G: Wrap-up (goal: a stable, well-told demo)
 
-### G1: UI polish and responsiveness
+### G1: UI polish and responsiveness ✅
 - **Owner**: B (with A's help)
 - **Goal**: elder app: large text, high contrast, button animations, status illustrations; dashboard: card layout, severity colors, alert banner; a disclaimer ("This product does not provide medical diagnosis").
 - **Files**: `web/static/style.css`, both templates.
