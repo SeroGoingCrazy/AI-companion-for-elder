@@ -158,7 +158,7 @@ def _say(c: TestClient, clock: Clock, text: str) -> list[Alert]:
             c.app.state.settings.symptoms,
             now=clock,
         )
-        return service.process_message(msg.id)
+        return service.process_message(msg.id).alerts
 
 
 def test_windows_follow_settings(client: TestClient) -> None:
@@ -197,19 +197,20 @@ def live(settings: Settings) -> Iterator[tuple[str, FastAPI]]:
     thread.join(timeout=10)
 
 
-def _read_events(lines: Iterator[str], n: int) -> list[tuple[str, dict]]:
+def _read_events(lines: Iterator[str], until: str) -> list[tuple[str, dict]]:
+    """Collect (event, data) pairs up to and including the first `until` event."""
     events, event = [], None
     for line in lines:
         if line.startswith("event:"):
             event = line.removeprefix("event:").strip()
-        elif line.startswith("data:") and event == "alert":
+        elif line.startswith("data:") and event:
             events.append((event, json.loads(line.removeprefix("data:"))))
-            if len(events) == n:
+            if event == until:
                 return events
     return events
 
 
-def test_sse_streams_symptom_and_fall_alerts(live: tuple[str, FastAPI]) -> None:
+def test_sse_streams_alerts_and_activity(live: tuple[str, FastAPI]) -> None:
     url, app = live
     with httpx.Client(base_url=url, timeout=10) as http:
         with http.stream("GET", "/api/alerts/stream") as stream:
@@ -220,14 +221,20 @@ def test_sse_streams_symptom_and_fall_alerts(live: tuple[str, FastAPI]) -> None:
             while app.state.alert_bus.subscriber_count == 0:
                 assert time.monotonic() < deadline, "SSE stream never subscribed"
                 time.sleep(0.02)
-            # POSTs return only after their background task ran, so the events are queued.
+            lines = stream.iter_lines()
+
             http.post("/api/chat", json={"text": CHEST}).raise_for_status()
+            turn = _read_events(lines, until="activity")
+
             fall = {"type": "fall", "level": "high", "title": "Fall detected"}
             http.post("/api/alerts", json=fall).raise_for_status()
-            events = _read_events(stream.iter_lines(), 3)
-    assert [(e, d["type"], d["title"]) for e, d in events] == [
-        ("alert", "symptom", "Chest pain"),
-        ("alert", "symptom", "Shortness of breath"),
-        ("alert", "fall", "Fall detected"),
+            [(event, data)] = _read_events(lines, until="alert")
+
+    assert [(e, d.get("title")) for e, d in turn] == [
+        ("alert", "Chest pain"),
+        ("alert", "Shortness of breath"),
+        ("activity", None),
     ]
-    assert all(d["level"] == "high" and d["id"] > 0 for _, d in events)
+    assert all(d["level"] == "high" and d["type"] == "symptom" for _, d in turn[:2])
+    assert turn[2][1] == {"message_id": 1, "symptoms": 2}
+    assert (event, data["type"], data["title"]) == ("alert", "fall", "Fall detected")
