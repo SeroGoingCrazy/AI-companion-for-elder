@@ -29,12 +29,15 @@ symptoms:
   alert_debounce_hours: 2
 
 fall:
-  aspect_ratio_threshold: 1.2
-  torso_angle_deg: 60
-  drop_ratio: 0.35
-  drop_window_s: 0.6
-  down_confirm_s: 3
-  cooldown_s: 30
+  model: ${FALL_MODEL:-models/yolo11n-pose.pt}   # fetched by scripts/fetch_demo_media.py
+  device: ${FALL_DEVICE:-cpu}                    # cpu | mps (Apple Silicon) | 0 (CUDA)
+  min_keypoint_conf: 0.3                         # keypoints below this are ignored
+  aspect_ratio_threshold: 1.2                    # bbox width / height above this = lying
+  torso_angle_deg: 60                            # torso this far from vertical = lying
+  drop_ratio: 0.25                               # hip drop, as a fraction of standing height ...
+  drop_window_s: 0.6                             # ... within this long = a fall, not lying down
+  down_confirm_s: 3                              # on the floor this long => alert
+  cooldown_s: 30                                 # no repeat alert for the same person
   vision_verify: false
   report_url: ${FALL_REPORT_URL:-http://localhost:8000/api/alerts}
   mcp:
@@ -42,7 +45,7 @@ fall:
     port: 8001
     events_path: data/fall_events.jsonl
     snapshots_dir: data/snapshots
-    autostart_source: ${FALL_SOURCE:-demo/videos/fall_01.mp4}   # empty = wait for start_monitoring
+    autostart_source: ${FALL_SOURCE:-demo/videos/walk.mp4}   # looped on launch; empty = wait for start_monitoring
 
 database:
   url: ${DATABASE_URL:-sqlite:///data/app.db}   # relative sqlite paths resolve against the project root

@@ -95,6 +95,9 @@ class FallMCPSettings(_Model):
 
 
 class FallSettings(_Model):
+    model: str = "models/yolo11n-pose.pt"
+    device: str = "cpu"
+    min_keypoint_conf: float = 0.3
     aspect_ratio_threshold: float
     torso_angle_deg: float
     drop_ratio: float

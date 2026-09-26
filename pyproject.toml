@@ -28,6 +28,7 @@ elder-web = "elder_companion.web.app:main"
 vision = [
     "ultralytics>=8.3",
     "opencv-python>=4.10",
+    "lap>=0.5.12",           # ultralytics ByteTrack
 ]
 
 [dependency-groups]
