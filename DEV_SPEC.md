@@ -144,7 +144,10 @@ The elder never has to "fill out a health form". When the agent hears something 
 - Frontend `MediaRecorder` (`audio/webm;codecs=opus`; Safari falls back to `audio/mp4`): hold to record, release to upload.
 - Microphone access requires a secure context: use `http://localhost` or HTTPS for the demo (phones need HTTPS; see risks in 3.9).
 - Browser autoplay restrictions: audio playback after the first user interaction (pressing the button) is allowed, which our flow satisfies.
-- `/api/chat` returns `{user_text, reply_text, audio_url}`; audio files are stored in `data/audio/` and returned as static paths.
+- `POST /api/chat/audio` returns `{message_id, user_text, reply_text, fallback, need_retry}`; the frontend then fetches `GET /api/tts/{message_id}` (mp3 cached in `data/audio/`, served `no-cache` + ETag so a DB reset never replays stale audio).
+- **Silence**: the ASR model invents sentences for silent clips, so the page measures mic level while recording and never uploads a clip whose peak RMS stays below a speech threshold.
+- **Script**: without a hint, Mandarin comes back in Traditional characters; `llm.asr_prompt` (a description nobody would say aloud) steers it to Simplified, and transcripts that merely echo that prompt are discarded.
+- **One question per reply** is enforced in code (`chat/postprocess.py`): the prompt rule alone was ignored about half the time in Chinese.
 
 ### 3.3 Technical Analysis: Conversation Orchestration
 
@@ -460,7 +463,7 @@ elder_companion.family_agent (E5) ──▶ accesses fall data only through the 
 ### 5.4 Data Flows
 
 **The elder says something**:
-`elder.js recording` → `POST /api/chat (multipart audio)` → `transcribe` → save `message(user)` → `context.build` (profile + recent symptoms + last 10 turns) → `chat` → save `message(assistant)` → return `{user_text, reply_text}` → frontend shows text → `GET /api/tts/{message_id}` fetches audio and plays it; meanwhile `BackgroundTask: extractor → merge → rules → alerts.create → bus.publish`.
+`elder.js recording` → `POST /api/chat/audio (multipart)` → `transcribe` → save `message(user)` → `context.build` (profile + recent symptoms + last 10 turns) → `chat` → save `message(assistant)` → return `{user_text, reply_text}` → frontend shows text → `GET /api/tts/{message_id}` fetches audio and plays it; meanwhile `BackgroundTask: extractor → merge → rules → alerts.create → bus.publish`.
 
 **Real-time alerts on the dashboard**:
 `family.js EventSource('/api/alerts/stream')` ← `alerts.bus` (in-process `asyncio.Queue` broadcast) ← `alerts.create` (symptom rules / fall reports).
@@ -476,9 +479,10 @@ elder_companion.family_agent (E5) ──▶ accesses fall data only through the 
 | Method | Path | Request / Response | Owner |
 |---|---|---|---|
 | GET | `/elder`, `/family` | Pages | A |
-| POST | `/api/chat` | multipart `audio` or JSON `{text}` → `{message_id, user_text, reply_text, fallback}` | A |
+| POST | `/api/chat` | JSON `{text}` → `{message_id, user_text, reply_text, fallback, need_retry}` | A |
+| POST | `/api/chat/audio` | multipart `audio` (+ optional `elder_id`) → same shape; `need_retry: true` = "please say it again", nothing saved | A |
 | POST | `/api/chat/greet` | optional `{elder_id}` → `{message_id, user_text: "", reply_text, fallback}` | A |
-| GET | `/api/tts/{message_id}` | → `audio/mpeg` | A |
+| GET | `/api/tts/{message_id}` | → `audio/mpeg` (ETag/304), 204 if TTS unavailable (page falls back to browser speech) | A |
 | GET | `/api/messages?limit=` | Conversation history | A |
 | GET | `/api/symptoms?days=7` | Symptom log (grouped by day) | A |
 | GET | `/api/summary/today` | `{summary, generated_at}` | A |
@@ -569,7 +573,7 @@ fall:
 |---|---|---|
 | A | A1 A2 A3 | ✅✅✅ |
 | B | B1 B2 B3 | ✅✅✅ |
-| C | C1 C2 C3 | ⬜⬜⬜ |
+| C | C1 C2 C3 | ✅✅✅ |
 | D | D1 D2 D3 D4 | ⬜⬜⬜⬜ |
 | E | E1 E2 E3 E4 E5* | ⬜⬜⬜⬜⬜ |
 | F | F1 F2 F3 F4 F5 F6 F7 F8 F9* | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ |
@@ -577,7 +581,7 @@ fall:
 
 ### 📈 Overall Progress
 
-`6 / 31` (* = optional task, not required for delivery)
+`9 / 31` (* = optional task, not required for delivery)
 
 ---
 
@@ -638,29 +642,30 @@ fall:
 
 ## Stage C: Voice Pipeline (goal: the elder app can listen and speak)
 
-### C1: Speech transcription
+### C1: Speech transcription ✅
 - **Owner**: A
-- **Goal**: `/api/chat` accepts multipart `audio` (webm / mp4 / wav), transcribes it, then follows the B3 flow; empty or too-short transcriptions return `{"need_retry": true}`.
-- **Files**: `web/routes/chat.py`, `chat/service.py`, `tests/integration/test_chat_audio.py`.
+- **Goal**: `POST /api/chat/audio` (a separate endpoint rather than content-type sniffing on `/api/chat`) accepts multipart `audio` (webm / mp4 / wav), transcribes it, then follows the B3 flow; empty or too-short transcriptions and ASR failures return `{"need_retry": true}` without saving anything.
+- **Files**: `web/routes/chat.py`, `chat/service.py`, `llm/client.py` (`asr_prompt`, echo guard), `tests/integration/test_chat_audio.py`.
 - **Classes/functions**: `ChatService.reply_audio(elder_id, upload) -> ChatResult`.
-- **Acceptance**: uploading `tests/fixtures/hello.webm` returns the correct `user_text` (real API); the flow passes under mock.
+- **Acceptance**: a real clip returns the correct `user_text` (verified with real English and Mandarin clips; Mandarin comes back in Simplified characters); the flow passes under mock.
 - **How to test**: `uv run pytest -q tests/integration/test_chat_audio.py`.
 
-### C2: TTS
+### C2: TTS ✅
 - **Owner**: A
 - **Goal**: `GET /api/tts/{message_id}` generates and caches an mp3 (`data/audio/{id}.mp3`) using `tts_instructions` (slow, warm); on failure return 204 and the frontend shows text only.
 - **Files**: `web/routes/chat.py`, `chat/service.py`.
 - **Classes/functions**: `ChatService.synthesize(message_id) -> Path`.
-- **Acceptance**: opening the URL directly in a browser plays audio; a second request hits the cache.
+- **Acceptance**: opening the URL directly in a browser plays audio; a second request hits the server-side cache; `If-None-Match` returns 304.
 - **How to test**: manual; `tests/integration/test_tts.py` (mock returns a silent mp3).
 
-### C3: Elder app page
+### C3: Elder app page ✅
 - **Owner**: A (B polishes styling in G1)
 - **Goal**: `/elder` page — a big round button (hold-to-talk / tap-to-toggle modes), status indicator (listening / thinking / speaking), the last 3 chat bubbles, font size ≥ 24px, high contrast; tapping "Start chatting" on entry triggers greet and unlocks audio playback; a hidden text input as fallback.
 - **Files**: `web/templates/elder.html`, `web/static/elder.js`, `web/static/style.css`, `web/routes/pages.py`.
 - **Classes/functions**: `startRecording()`, `stopAndSend()`, `playReply(messageId)`, `setStatus(state)`.
 - **Acceptance**: one full voice round-trip on Chrome + Safari (laptop) via `localhost`; end-to-end < 5s.
-- **How to test**: manual; record latency over 5 rounds.
+- **How to test**: manual; record latency over 5 rounds (`window.__timings` in the console).
+- **Measured (real API, 5 voice turns)**: reply text median 1.67s, text + audio median 3.39s (one long Chinese reply took 6.8s, dominated by TTS). Full browser recording path (MediaRecorder → level meter → upload → ASR → reply → TTS) verified in Chromium with a virtual mic; still to verify on a real microphone and on Safari.
 
 ---
 
