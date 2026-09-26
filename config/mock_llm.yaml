@@ -25,3 +25,8 @@ json: {}
 
 transcribe:
   default: "Good morning! I'm doing okay today."
+
+tts:
+  # false -> /api/tts answers 204 and the elder page speaks with the browser's built-in voice
+  # (audible in an offline demo, instead of the mock's silent mp3).
+  available: false

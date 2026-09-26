@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -34,14 +36,24 @@ FALLBACK_GREETING = {
     "zh": "{nickname}，你好呀！今天感觉怎么样？",
 }
 MAX_FOLLOW_UPS = 5
+# Transcripts shorter than this are treated as noise (a cough, a mis-press).
+MIN_TRANSCRIPT_CHARS = 2
+
+
+class MessageNotFound(LookupError):
+    pass
 
 
 @dataclass(frozen=True)
 class ChatResult:
-    message_id: int  # the assistant message (used later to fetch its TTS audio)
+    message_id: int | None  # the assistant message (used to fetch its TTS audio)
     user_text: str
     reply_text: str
     fallback: bool = False  # True when the LLM failed and a canned reply was used
+    need_retry: bool = False  # True when speech could not be understood; nothing was saved
+
+
+NEED_RETRY = ChatResult(message_id=None, user_text="", reply_text="", need_retry=True)
 
 
 class ChatService:
@@ -50,11 +62,13 @@ class ChatService:
         session: Session,
         llm: BaseLLMClient,
         settings: ChatSettings,
+        audio_dir: Path | None = None,
         now: Callable[[], datetime] | None = None,
     ) -> None:
         self._session = session
         self._llm = llm
         self._s = settings
+        self._audio_dir = audio_dir
         self._now = now or (lambda: datetime.now(settings.tz))
 
     def reply(self, elder_id: int | None, text: str) -> ChatResult:
@@ -80,6 +94,18 @@ class ChatService:
         assistant_msg = self._save(elder, "assistant", reply)
         return ChatResult(assistant_msg.id, user_msg.text, reply, fallback)
 
+    def reply_audio(self, elder_id: int | None, audio: bytes, *, filename: str) -> ChatResult:
+        """Transcribe a voice clip, then reply. Unintelligible audio returns NEED_RETRY."""
+        elder = get_elder(self._session, elder_id)  # 404 before spending an API call
+        try:
+            text = self._llm.transcribe(audio, filename=filename)
+        except LLMError:
+            logger.warning("transcription failed; asking the elder to repeat", exc_info=True)
+            return NEED_RETRY
+        if len(text.strip()) < MIN_TRANSCRIPT_CHARS:
+            return NEED_RETRY
+        return self.reply(elder.id, text)
+
     def greet(self, elder_id: int | None) -> ChatResult:
         elder = get_elder(self._session, elder_id)
         now = self._now()
@@ -102,6 +128,29 @@ class ChatService:
             fallback = True
         assistant_msg = self._save(elder, "assistant", reply)
         return ChatResult(assistant_msg.id, "", reply, fallback)
+
+    def synthesize(self, message_id: int) -> Path | None:
+        """Return a cached mp3 for an assistant message, generating it once. None if TTS fails."""
+        if self._audio_dir is None:
+            raise RuntimeError("ChatService was created without an audio_dir")
+        msg = self._session.get(Message, message_id)
+        if msg is None or msg.role != "assistant":
+            raise MessageNotFound(message_id)
+        path = self._audio_dir / f"{msg.id}.mp3"
+        if path.exists():
+            return path
+        try:
+            data = self._llm.tts(msg.text)
+        except LLMError:
+            logger.warning("TTS failed for message %s; client falls back to text", msg.id)
+            return None
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(f"{path.stem}.{uuid.uuid4().hex}.tmp")
+        tmp.write_bytes(data)
+        tmp.replace(path)  # atomic: concurrent requests never see a half-written file
+        msg.audio_path = f"audio/{path.name}"
+        self._session.commit()
+        return path
 
     def _save(self, elder: Elder, role: str, text: str) -> Message:
         msg = Message(elder_id=elder.id, role=role, text=text)

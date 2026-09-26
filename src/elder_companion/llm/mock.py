@@ -13,7 +13,7 @@ from typing import Any
 
 import yaml
 
-from elder_companion.llm.client import BaseLLMClient, ChatMessage
+from elder_companion.llm.client import BaseLLMClient, ChatMessage, LLMError
 from elder_companion.settings import PROJECT_ROOT
 
 DEFAULT_MOCK_CONFIG = PROJECT_ROOT / "config" / "mock_llm.yaml"
@@ -76,4 +76,7 @@ class MockLLMClient(BaseLLMClient):
 
     def tts(self, text: str) -> bytes:
         self.calls.append(("tts", text))
+        # available: false makes the app answer 204, so the browser speaks with its own voice.
+        if not self.config.get("tts", {}).get("available", True):
+            raise LLMError("mock TTS disabled")
         return SILENT_MP3

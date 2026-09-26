@@ -34,6 +34,7 @@ def create_app(settings: Settings | None = None, llm: BaseLLMClient | None = Non
 
     app.include_router(alerts.router)
     app.include_router(chat.router)
+    app.include_router(chat.tts_router)
 
     @app.get("/healthz", tags=["meta"])
     def healthz() -> dict[str, str]:
