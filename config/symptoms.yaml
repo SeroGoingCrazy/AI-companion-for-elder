@@ -1,0 +1,117 @@
+# Single source of truth for symptom canonicals (DEV_SPEC 3.4.1).
+# - The extractor's JSON-schema enum, the prompt's symptom list and the alert rules all read this file.
+# - red_flag: true  -> always a `high` alert (emergency-type symptom).
+# - red_flag: false -> a `medium` alert only when severity=severe.
+# - hint: what counts as this symptom; shown to the extraction model.
+
+symptoms:
+  - canonical: chest_pain
+    en: Chest pain
+    zh: 胸痛胸闷
+    red_flag: true
+    hint: chest pain, pressure or tightness
+  - canonical: shortness_of_breath
+    en: Shortness of breath
+    zh: 呼吸困难
+    red_flag: true
+    hint: trouble breathing, can't catch one's breath
+  - canonical: numbness_weakness
+    en: One-sided numbness or weakness
+    zh: 单侧麻木无力
+    red_flag: true
+    hint: sudden numbness or weakness, especially of the face, an arm or a leg on one side
+  - canonical: slurred_speech
+    en: Slurred speech
+    zh: 说话不清
+    red_flag: true
+    hint: slurred speech, trouble getting words out
+  - canonical: confusion
+    en: Confusion
+    zh: 意识混乱
+    red_flag: true
+    hint: sudden confusion or disorientation (not ordinary forgetfulness)
+  - canonical: fall
+    en: Fall
+    zh: 摔倒
+    red_flag: true
+    hint: she fell or slipped and went down
+  - canonical: self_harm
+    en: Self-harm thoughts
+    zh: 自伤念头
+    red_flag: true
+    hint: thoughts of hurting herself or not wanting to live
+  - canonical: dizziness
+    en: Dizziness
+    zh: 头晕
+    red_flag: false
+    hint: dizzy, lightheaded, the room spinning
+  - canonical: headache
+    en: Headache
+    zh: 头痛
+    red_flag: false
+    hint: headache
+  - canonical: fatigue
+    en: Fatigue
+    zh: 乏力疲倦
+    red_flag: false
+    hint: unusually tired, no energy
+  - canonical: insomnia
+    en: Poor sleep
+    zh: 失眠睡不好
+    red_flag: false
+    hint: trouble falling or staying asleep
+  - canonical: cough
+    en: Cough
+    zh: 咳嗽
+    red_flag: false
+    hint: cough
+  - canonical: fever
+    en: Fever
+    zh: 发烧
+    red_flag: false
+    hint: fever, feeling feverish
+  - canonical: nausea
+    en: Nausea
+    zh: 恶心
+    red_flag: false
+    hint: nausea, vomiting
+  - canonical: stomach_pain
+    en: Stomach pain
+    zh: 胃痛腹痛
+    red_flag: false
+    hint: stomach ache, belly pain
+  - canonical: joint_pain
+    en: Joint pain
+    zh: 关节痛
+    red_flag: false
+    hint: knee, hip, hand or other joint pain
+  - canonical: back_pain
+    en: Back pain
+    zh: 腰背痛
+    red_flag: false
+    hint: back or lower-back pain
+  - canonical: low_mood
+    en: Low mood
+    zh: 情绪低落
+    red_flag: false
+    hint: feeling sad, down, hopeless
+  - canonical: loneliness
+    en: Loneliness
+    zh: 孤独
+    red_flag: false
+    hint: feeling lonely or isolated
+  - canonical: memory_issue
+    en: Memory problems
+    zh: 记忆力差
+    red_flag: false
+    hint: forgetting things, e.g. whether she took her pill
+  - canonical: appetite_loss
+    en: Poor appetite
+    zh: 食欲不振
+    red_flag: false
+    hint: not hungry, eating much less
+  - canonical: other
+    en: Other
+    zh: 其他
+    red_flag: false
+    hint: any other physical or emotional complaint; describe it in `label`
