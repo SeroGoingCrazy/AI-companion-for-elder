@@ -14,9 +14,12 @@ from elder_companion.settings import (
 pytestmark = pytest.mark.unit
 
 
+_ENV_VARS = ("LLM_PROVIDER", "OPENAI_API_KEY", "CHAT_MODEL", "DATABASE_URL", "DATA_DIR", "PORT")
+
+
 @pytest.fixture(autouse=True)
 def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    for name in ("LLM_PROVIDER", "OPENAI_API_KEY", "CHAT_MODEL", "DATABASE_URL", "DATA_DIR", "PORT"):
+    for name in _ENV_VARS:
         monkeypatch.delenv(name, raising=False)
 
 
