@@ -52,6 +52,7 @@ class ChatResult:
     reply_text: str
     fallback: bool = False  # True when the LLM failed and a canned reply was used
     need_retry: bool = False  # True when speech could not be understood; nothing was saved
+    user_message_id: int | None = None  # the elder's message (fed to the symptom pipeline)
 
 
 NEED_RETRY = ChatResult(message_id=None, user_text="", reply_text="", need_retry=True)
@@ -94,7 +95,9 @@ class ChatService:
             logger.warning("chat LLM call failed; using fallback reply", exc_info=True)
             reply, fallback = FALLBACK_REPLY[detect_language(text)], True
         assistant_msg = self._save(elder, "assistant", reply)
-        return ChatResult(assistant_msg.id, user_msg.text, reply, fallback)
+        return ChatResult(
+            assistant_msg.id, user_msg.text, reply, fallback, user_message_id=user_msg.id
+        )
 
     def reply_audio(self, elder_id: int | None, audio: bytes, *, filename: str) -> ChatResult:
         """Transcribe a voice clip, then reply. Unintelligible audio returns NEED_RETRY."""

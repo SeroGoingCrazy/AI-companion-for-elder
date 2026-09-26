@@ -2,13 +2,22 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, HTTPException, Request, Response, UploadFile
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+)
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from elder_companion.chat.service import ChatResult, MessageNotFound
 from elder_companion.elders import ElderNotFound
-from elder_companion.web.deps import ChatServiceDep
+from elder_companion.web.deps import ChatServiceDep, SymptomPipelineDep
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 tts_router = APIRouter(prefix="/api/tts", tags=["chat"])
@@ -76,18 +85,32 @@ class ChatOut(BaseModel):
         )
 
 
+def schedule_symptoms(
+    result: ChatResult, tasks: BackgroundTasks, pipeline: SymptomPipelineDep
+) -> None:
+    """Extract symptoms after the response is sent, so chat latency is unaffected."""
+    if result.user_message_id is not None:
+        tasks.add_task(pipeline, result.user_message_id)
+
+
 @router.post("", response_model=ChatOut)
-def chat(body: ChatIn, service: ChatServiceDep) -> ChatOut:
+def chat(
+    body: ChatIn, service: ChatServiceDep, tasks: BackgroundTasks, pipeline: SymptomPipelineDep
+) -> ChatOut:
     """One text turn."""
     try:
-        return ChatOut.of(service.reply(body.elder_id, body.text))
+        result = service.reply(body.elder_id, body.text)
     except ElderNotFound as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
+    schedule_symptoms(result, tasks, pipeline)
+    return ChatOut.of(result)
 
 
 @router.post("/audio", response_model=ChatOut)
 def chat_audio(
     service: ChatServiceDep,
+    tasks: BackgroundTasks,
+    pipeline: SymptomPipelineDep,
     audio: Annotated[UploadFile, File(description="MediaRecorder clip (webm/mp4/wav/...)")],
     elder_id: Annotated[int | None, Form()] = None,
 ) -> ChatOut:
@@ -101,6 +124,7 @@ def chat_audio(
         result = service.reply_audio(elder_id, data, filename=audio_filename(audio.content_type))
     except ElderNotFound as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
+    schedule_symptoms(result, tasks, pipeline)
     return ChatOut.of(result)
 
 

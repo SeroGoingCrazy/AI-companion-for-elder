@@ -11,10 +11,12 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from elder_companion import __version__
+from elder_companion.alerts.bus import AlertBus
 from elder_companion.db import init_db, make_engine, make_sessionmaker
 from elder_companion.llm import BaseLLMClient, get_llm
 from elder_companion.seed import seed_demo
 from elder_companion.settings import Settings, get_settings
+from elder_companion.symptoms.extractor import SymptomExtractor
 from elder_companion.web.routes import alerts, chat, pages
 
 
@@ -32,6 +34,8 @@ def create_app(settings: Settings | None = None, llm: BaseLLMClient | None = Non
     app.state.engine = engine
     app.state.sessionmaker = session_factory
     app.state.llm = llm or get_llm(settings.llm)
+    app.state.symptom_extractor = SymptomExtractor(app.state.llm)
+    app.state.alert_bus = AlertBus()
 
     app.include_router(alerts.router)
     app.include_router(chat.router)
