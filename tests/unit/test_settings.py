@@ -14,7 +14,16 @@ from elder_companion.settings import (
 pytestmark = pytest.mark.unit
 
 
-_ENV_VARS = ("LLM_PROVIDER", "OPENAI_API_KEY", "CHAT_MODEL", "DATABASE_URL", "DATA_DIR", "PORT")
+_ENV_VARS = (
+    "LLM_PROVIDER",
+    "OPENAI_API_KEY",
+    "CHAT_MODEL",
+    "DATABASE_URL",
+    "DATA_DIR",
+    "PORT",
+    "ELDER_TIMEZONE",
+    "COMPANION_NAME",
+)
 
 
 @pytest.fixture(autouse=True)
@@ -91,3 +100,18 @@ def test_unknown_provider_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_missing_file(tmp_path: Path) -> None:
     with pytest.raises(SettingsError, match="not found"):
         load_settings(tmp_path / "nope.yaml", load_env_file=False)
+
+
+def test_invalid_timezone_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    data = _base()
+    data["chat"]["timezone"] = "Mars/Olympus_Mons"
+    with pytest.raises(SettingsError, match="chat.timezone unknown timezone"):
+        load_settings(_write(tmp_path, data), load_env_file=False)
+
+
+def test_chat_timezone_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    s = load_settings(load_env_file=False)
+    assert s.chat.tz.key == "America/Los_Angeles"
+    assert s.chat.companion_name == "Sunny"
