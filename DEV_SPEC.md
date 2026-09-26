@@ -561,7 +561,7 @@ fall:
 
 | Stage | Tasks | Status |
 |---|---|---|
-| A | A1 A2 A3 | ✅⬜⬜ |
+| A | A1 A2 A3 | ✅✅✅ |
 | B | B1 B2 B3 | ⬜⬜⬜ |
 | C | C1 C2 C3 | ⬜⬜⬜ |
 | D | D1 D2 D3 D4 | ⬜⬜⬜⬜ |
@@ -571,7 +571,7 @@ fall:
 
 ### 📈 Overall Progress
 
-`1 / 31` (* = optional task, not required for delivery)
+`3 / 31` (* = optional task, not required for delivery)
 
 ---
 
@@ -584,7 +584,7 @@ fall:
 - **Acceptance**: `uv sync` succeeds; `uv run python -c "import elder_companion, fall_detector"` passes.
 - **How to test**: `uv run pytest -q` (empty suite passes).
 
-### A2: Settings loading
+### A2: Settings loading ✅
 - **Owner**: A
 - **Goal**: read `config/settings.yaml` with `${ENV:-default}` expansion; auto-load `.env`; fail at startup if `OPENAI_API_KEY` is missing and `provider=openai`.
 - **Files**: `src/elder_companion/settings.py`, `config/settings.yaml`, `tests/unit/test_settings.py`.
@@ -592,12 +592,12 @@ fall:
 - **Acceptance**: environment variables override defaults; a missing key error names the variable.
 - **How to test**: `uv run pytest -q tests/unit/test_settings.py`.
 
-### A3: Data model, seed data, and API contract freeze
+### A3: Data model, seed data, and API contract freeze ✅
 - **Owner**: A (confirm the contract with B)
 - **Goal**: create the 4 tables; seed one demo elder (name, nickname, language, profile: age, lives alone, high blood pressure, hobbies); bring up an empty FastAPI shell and implement `POST /api/alerts` first (so B can integrate early).
-- **Files**: `db.py`, `models.py`, `seed.py`, `web/app.py`, `web/routes/alerts.py`, `alerts/service.py`.
+- **Files**: `db.py`, `models.py`, `seed.py`, `web/app.py`, `web/deps.py`, `web/routes/alerts.py`, `alerts/schemas.py`, `alerts/service.py`.
 - **Classes/functions**: `Elder`, `Message`, `SymptomLog`, `Alert`; `init_db()`, `seed_demo()`; `AlertIn` / `AlertOut` schemas; `create_alert()`.
-- **Acceptance**: `uv run uvicorn elder_companion.web.app:app` starts; `curl -X POST /api/alerts` returns 201 and the row is stored.
+- **Acceptance**: `uv run elder-web` (or `uv run uvicorn --factory elder_companion.web.app:create_app`) starts; `curl -X POST /api/alerts` returns 201 and the row is stored.
 - **How to test**: `uv run pytest -q tests/integration/test_alerts_api.py`.
 
 ---
