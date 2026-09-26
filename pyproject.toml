@@ -20,6 +20,9 @@ dependencies = [
     "mcp>=1.9",
 ]
 
+[project.scripts]
+elder-web = "elder_companion.web.app:main"
+
 [project.optional-dependencies]
 vision = [
     "ultralytics>=8.3",
