@@ -4,20 +4,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from elder_companion.alerts.schemas import AlertIn
-from elder_companion.models import DEFAULT_ELDER_ID, Alert, Elder
-
-
-class ElderNotFound(LookupError):
-    def __init__(self, elder_id: int) -> None:
-        super().__init__(f"elder {elder_id} not found")
-        self.elder_id = elder_id
+from elder_companion.elders import get_elder
+from elder_companion.models import DEFAULT_ELDER_ID, Alert
 
 
 def create_alert(session: Session, data: AlertIn) -> Alert:
-    elder_id = data.elder_id or DEFAULT_ELDER_ID
-    if session.get(Elder, elder_id) is None:
-        raise ElderNotFound(elder_id)
-    alert = Alert(**data.model_dump(exclude={"elder_id"}), elder_id=elder_id)
+    elder = get_elder(session, data.elder_id)
+    alert = Alert(**data.model_dump(exclude={"elder_id"}), elder_id=elder.id)
     session.add(alert)
     session.commit()
     return alert

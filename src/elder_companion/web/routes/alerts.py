@@ -3,7 +3,8 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query, status
 
 from elder_companion.alerts.schemas import AlertIn, AlertOut
-from elder_companion.alerts.service import ElderNotFound, create_alert, list_alerts
+from elder_companion.alerts.service import create_alert, list_alerts
+from elder_companion.elders import ElderNotFound
 from elder_companion.web.deps import SessionDep
 
 router = APIRouter(prefix="/api/alerts", tags=["alerts"])
