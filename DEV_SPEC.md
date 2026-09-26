@@ -575,13 +575,13 @@ fall:
 | B | B1 B2 B3 | ✅✅✅ |
 | C | C1 C2 C3 | ✅✅✅ |
 | D | D1 D2 D3 D4 | ✅✅✅✅ |
-| E | E1 E2 E3 E4 E5* | ⬜⬜⬜⬜⬜ |
+| E | E1 E2 E3 E4 E5* | ✅✅✅✅⬜ |
 | F | F1 F2 F3 F4 F5 F6 F7 F8 F9* | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ |
 | G | G1 G2 G3 G4 | ⬜⬜⬜⬜ |
 
 ### 📈 Overall Progress
 
-`13 / 31` (* = optional task, not required for delivery)
+`17 / 31` (* = optional task, not required for delivery)
 
 ---
 
@@ -709,35 +709,39 @@ fall:
 
 ## Stage E: Family Dashboard (goal: see the elder's status on one screen)
 
-### E1: Dashboard data endpoints
+### E1: Dashboard data endpoints ✅
 - **Owner**: A
 - **Goal**: `/api/symptoms?days=7` (grouped by day, with count, status, raw_quote), `/api/messages`, `/api/alerts`, `/api/alerts/{id}/read`.
 - **Files**: `web/routes/family.py`, `web/routes/alerts.py`, `tests/integration/test_family_api.py`.
 - **Acceptance**: with seed data, responses have the shape the frontend needs (fields asserted in tests).
 - **How to test**: `uv run pytest -q tests/integration/test_family_api.py`.
+- **Notes**: days are the elder's calendar days (`chat.timezone`), newest first, empty days included; each row sits on the day it was last mentioned. All API timestamps now carry a UTC offset (`UtcDateTime`): naive values made browsers read them as local time.
 
-### E2: Today's summary
+### E2: Today's summary ✅
 - **Owner**: A
 - **Goal**: `daily_summary.txt` (2–3 sentences: mood, discomforts mentioned, things to watch; no diagnosis); 10-minute cache; returns "No conversations yet today" when there is no chat.
 - **Files**: `summary.py`, `config/prompts/daily_summary.txt`, `web/routes/family.py`.
 - **Classes/functions**: `DailySummary.get(elder_id, date)`.
 - **Acceptance**: after 5 turns of chat the summary accurately mentions the symptoms and contains no diagnostic language.
-- **How to test**: manual; mock unit tests cover the caching logic.
+- **How to test**: manual; mock unit tests cover the caching logic (`tests/unit/test_summary.py`).
+- **Notes**: `GET /api/summary/today?refresh=true` → `{summary, generated_at, fallback, empty}`. The cache is keyed on today's data (last message, symptom rows, alerts) as well as the 10-minute TTL, so a refresh right after a new symptom is never stale. LLM failure → a plain rule-based summary (`fallback: true`, not cached). Real API: 5 demo turns summarized in 1.1s, mentioning the chest alert first, the dizziness, poor sleep and the improved knee, with no diagnosis.
 
-### E3: Seed history data
+### E3: Seed history data ✅
 - **Owner**: A
 - **Goal**: `seed.py --with-history` generates conversations and symptoms for the past 6 days (recurring knee pain, improving insomnia, etc.) so the timeline looks full in the demo.
 - **Files**: `seed.py`.
 - **Acceptance**: the dashboard timeline shows 7 days of data with a coherent story.
 - **How to test**: `uv run python -m elder_companion.seed --reset --with-history`.
+- **Story**: knee pain on cold mornings (severe on day -4 → a read medium alert), poor sleep improving mid-week, one lonely evening, and the knee aching again yesterday so today's greeting follows up on it. Today is left empty for the live demo. Skipped if the elder already has messages.
 
-### E4: Dashboard page
+### E4: Dashboard page ✅
 - **Owner**: A (features) / B (styling)
 - **Goal**: `/family` page — today's summary card at the top; symptom timeline on the left (by day, severity color chips, counts, click to see the original quote); alert list on the right (falls with snapshot thumbnails); fall-detection panel `<img src=":8001/stream">`; a red banner + sound at the top when `EventSource` receives an alert; collapsible conversation history.
 - **Files**: `web/templates/family.html`, `web/static/family.js`, `web/static/style.css`.
 - **Classes/functions**: `loadSummary()`, `loadSymptoms()`, `loadAlerts()`, `connectAlertStream()`, `showAlertBanner(alert)`.
 - **Acceptance**: elder mentions a red-flag symptom → the dashboard shows the banner within ≤ 10s (including extraction time); the page works at both 1280px and 390px widths.
-- **How to test**: manual (two windows side by side).
+- **How to test**: manual (two windows side by side); `tests/integration/test_pages.py` covers render/config/snapshots.
+- **Notes**: the SSE stream also carries `event: activity` after every elder turn, so a mild symptom such as dizziness shows up without an alert or polling. Fall snapshots are served at `/media/snapshots/…` from `paths.data_dir`. Browsers only allow the chime after a click, so it has a "Sound on" toggle; on load the newest unread urgent alert is shown in the banner. Measured: the banner appeared < 1s after the chest line (mock extraction), with the timeline, history and the "new activity" hint on the summary updating live.
 
 ### E5 (optional): "Ask AI" on the dashboard
 - **Owner**: A (depends on F7)
