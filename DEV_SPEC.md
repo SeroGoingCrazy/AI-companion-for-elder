@@ -1,166 +1,166 @@
 # Developer Specification (DEV_SPEC)
 
-> 项目：**Elder Companion Agent**（面向独居老人的 AI 陪伴 Agent + 子女看护端）
-> 版本：v0.1（设计定稿，待开发）
-> 周期：2 天 MVP；演示地点：美国；模型供应商：OpenAI
-> 团队：**A（功能 / 主程）**——后端、对话、语音、症状日志、子女端数据；**B（视觉 / 前端）**——跌倒检测、UI 打磨、演示素材
+> Project: **Elder Companion Agent** (an AI companion agent for older adults living alone, plus a family care dashboard)
+> Version: v0.1 (design finalized, development in progress)
+> Timeline: 2-day MVP; demo location: United States; model provider: OpenAI
+> Team: **A (features / lead dev)** — backend, chat, voice, symptom log, family dashboard data; **B (vision / frontend)** — fall detection, UI polish, demo materials
 
-## 目录
+## Table of Contents
 
-1. 项目概述
-2. 核心特点
-3. 技术选型与技术分析
-4. 测试方案
-5. 系统架构与模块设计
-6. 项目排期（开发阶段）
-7. 可扩展性与未来展望
-8. 附录：设计决策记录（ADR）
+1. Project Overview
+2. Key Features
+3. Technology Choices & Technical Analysis
+4. Testing Strategy
+5. System Architecture & Module Design
+6. Project Schedule (Development Stages)
+7. Extensibility & Future Work
+8. Appendix: Architecture Decision Records (ADR)
 
 ---
 
-## 1. 项目概述
+## 1. Project Overview
 
-独居老人最缺的是「有人说话」，子女最担心的是「身体出状况没人知道」。本项目用一个 AI Agent 同时解决两端：
+What older adults living alone lack most is *someone to talk to*; what their adult children worry about most is *a health problem nobody notices*. This project addresses both sides with a single AI agent:
 
-| 端 | 用户 | 形态 | 核心价值 |
+| Side | User | Form factor | Core value |
 |---|---|---|---|
-| **老人端** `/elder` | 老人 | 手机/平板浏览器，一个大按钮语音对话 | 随时有人陪聊、被关心；零学习成本 |
-| **子女端** `/family` | 子女 | 浏览器 Dashboard | 自动整理的症状日志、危险信号告警、跌倒检测、每日摘要 |
+| **Elder app** `/elder` | Older adult | Phone/tablet browser; one big button for voice chat | Someone to talk to and who cares, anytime; zero learning curve |
+| **Family dashboard** `/family` | Adult children | Browser dashboard | Auto-organized symptom log, red-flag alerts, fall detection, daily summary |
 
-老人不需要「填健康表」——Agent 在日常闲聊中听到「这两天早上起来头有点晕」，就自动抽取为结构化症状记录，同步给子女；听到「胸口闷」立即告警。子女端另接家中摄像头（演示用视频文件），检测跌倒并推送告警与截图。
+The elder never has to "fill out a health form". When the agent hears something like "I've been a bit dizzy in the mornings for the past couple of days" during casual chat, it automatically extracts a structured symptom record and syncs it to the family; if it hears "my chest feels tight", it alerts them immediately. The family side is also connected to a home camera (a video file for the demo) to detect falls and push alerts with snapshots.
 
-### 设计理念 (Design Philosophy)
+### Design Philosophy
 
-1. **陪伴优先，记录无感 (Companionship First, Invisible Logging)**
-   老人端只做对话，从不弹表单、不追问「请描述症状严重程度 1–10」。症状抽取在后台异步完成，不影响对话延迟与体验。
-2. **LLM 负责理解，代码负责决策 (LLM Understands, Code Decides)**
-   LLM 只输出「这句话里提到了什么症状」（结构化 JSON）；症状归一化、去重合并、是否告警、告警等级全部由确定性代码 + `config/symptoms.yaml` 规则完成——可测试、可解释、改规则不用改 prompt。
-3. **安全边界明确 (Care, Not Diagnosis)**
-   Agent 只关心、追问、建议告诉家人或就医；不诊断、不推荐药物。危险信号走代码规则兜底，不依赖 LLM「自觉」。
-4. **视觉能力协议化 (Vision as an MCP Server)**
-   跌倒检测是独立的 **fall-mcp** 服务：查询与控制能力（事件、截图、状态、视频分析）以 MCP 工具暴露，任何 MCP 客户端（本项目子女端问答 Agent、Claude Desktop、Cursor）都能直接使用；实时告警走 push（`POST /api/alerts`），因为 MCP 是客户端拉取模型。A、B 并行开发，检测进程挂了不影响对话。
-5. **演示可控 (Demo-Deterministic)**
-   所有外部依赖（OpenAI、摄像头）都有 mock / 预录素材替代路径；演示关键路径（症状日志、危险告警、跌倒告警）必须 100% 可复现。
+1. **Companionship First, Invisible Logging**
+   The elder app only talks. It never pops up forms or asks "please rate your symptom severity from 1 to 10". Symptom extraction runs asynchronously in the background and never affects chat latency or experience.
+2. **LLM Understands, Code Decides**
+   The LLM only outputs "which symptoms were mentioned in this utterance" (structured JSON). Normalization, de-duplication/merging, whether to alert, and alert level are all handled by deterministic code plus rules in `config/symptoms.yaml` — testable, explainable, and rules can change without touching prompts.
+3. **Care, Not Diagnosis**
+   The agent only shows concern, asks follow-up questions, and suggests telling family or seeing a doctor; it never diagnoses or recommends medication. Red-flag detection is backstopped by code rules rather than relying on the LLM's judgment.
+4. **Vision as an MCP Server**
+   Fall detection is a standalone **fall-mcp** service. Query and control capabilities (events, snapshots, status, video analysis) are exposed as MCP tools usable by any MCP client (this project's family Q&A agent, Claude Desktop, Cursor). Real-time alerts are pushed (`POST /api/alerts`) because MCP is a client-pull model. A and B develop in parallel, and a crashed detector never affects chat.
+5. **Demo-Deterministic**
+   Every external dependency (OpenAI, camera) has a mock or pre-recorded fallback; the critical demo paths (symptom log, red-flag alert, fall alert) must be 100% reproducible.
 
-### 非目标 (Non-Goals, v1)
+### Non-Goals (v1)
 
-- 不做医疗诊断、用药建议、与医院/HIS 系统对接
-- 不做注册登录与多家庭（写死 1 位老人 + 1 位子女，URL 直达）
-- 不做原生 App、不做推送通知（子女端页面内实时告警即可）
-- 不做 OpenAI Realtime 语音对语音（放入第 7 章）
-- 不做方言识别优化、不做本地 ASR/TTS
-- 跌倒检测不追求真实环境鲁棒性（演示以预录视频为主）
-
----
-
-## 2. 核心特点
-
-### 2.1 老人端能力
-
-- **语音对话**：按住说话 → 转写 → 回复 → 自动朗读；中英文自动跟随。
-- **有温度的人设**：称呼昵称、句子短、一次只问一个问题、记得老人的基本情况（画像）和最近对话。
-- **主动关怀**：对话开场/空闲时主动问候吃饭、睡眠、吃药、心情。
-- **健康话题安全处理**：表达关心 + 追问细节（部位、多久、多严重）+ 建议告诉家人/就医。
-
-### 2.2 症状日志（亮点）
-
-- 每条老人消息后台异步抽取症状 → 结构化 `symptom_log`。
-- 症状归一化到枚举（`dizziness`、`chest_pain`…），同一症状 24h 内合并计数，形成时间线。
-- 保留原话 `raw_quote`，子女可点开看老人原话，避免 LLM 「脑补」。
-- **危险信号规则**：胸痛、呼吸困难、单侧无力/说话不清、意识混乱、跌倒、自伤念头 → 高优先级告警实时推送。
-
-### 2.3 子女端能力
-
-- 今日摘要（2–3 句自然语言：精神状态、提到的不适、需要关注的事）
-- 症状时间线（按天分组、严重度色块、出现次数、原话）
-- 告警中心（症状类 / 跌倒类，跌倒附截图），SSE 实时弹出
-- 跌倒检测面板（实时检测画面 MJPEG + 最近事件）
-- 对话记录（只读）
-
-### 2.4 跌倒检测
-
-- YOLO11-pose 关键点 + 状态机规则判定（下落速度、躯干角度、倒地持续时间）。
-- 输入：摄像头或视频文件；输出：截图 + 告警事件。
-- 可选：截图交给 GPT 视觉模型二次确认，降低误报。
-- **以 MCP Server 对外（fall-mcp）**：`get_fall_events`、`get_event_snapshot`、`get_monitor_status`、`start_monitoring` / `stop_monitoring`、`analyze_video` 六个工具；Streamable HTTP（主）+ stdio（Claude Desktop）。
-- 子女端「问问 AI」（可选）：“妈妈今天有没有摔倒？最近哪里不舒服？”——Agent 通过 MCP 调跌倒工具 + 本地症状工具综合回答。
-
-### 2.5 演示核心指标（待填，由阶段 G 产出）
-
-| 指标 | 目标 | 实测 |
-|---|---|---|
-| 语音一轮端到端延迟 P50 | < 4s | – |
-| 症状抽取评测集准确率（症状名 + 是否危险） | ≥ 90% | – |
-| 危险信号召回（评测集） | 100% | – |
-| 演示视频跌倒检出 / 误报 | 全部检出 / 0 误报 | – |
+- No medical diagnosis, medication advice, or integration with hospital/EHR systems
+- No sign-up/login or multi-family support (one hard-coded elder + one family member, direct URLs)
+- No native app and no push notifications (real-time alerts inside the dashboard page are enough)
+- No OpenAI Realtime speech-to-speech (moved to Chapter 7)
+- No dialect-recognition tuning, no local ASR/TTS
+- Fall detection does not aim for real-world robustness (the demo relies mainly on pre-recorded video)
 
 ---
 
-## 3. 技术选型与技术分析
+## 2. Key Features
 
-### 3.1 总体技术栈
+### 2.1 Elder App
 
-| 层 | 选型 | 说明 |
+- **Voice chat**: hold to talk → transcription → reply → read aloud automatically; follows English or Chinese automatically.
+- **A warm persona**: addresses the elder by nickname, uses short sentences, asks one question at a time, remembers the elder's background (profile) and recent conversations.
+- **Proactive care**: at conversation start or when idle, proactively asks about meals, sleep, medication, and mood.
+- **Safe handling of health topics**: express concern + ask for details (where, how long, how bad) + suggest telling family / seeing a doctor.
+
+### 2.2 Symptom Log (Highlight)
+
+- Every elder message is processed asynchronously in the background to extract symptoms → structured `symptom_log`.
+- Symptoms are normalized to an enum (`dizziness`, `chest_pain`, …); repeats of the same symptom within 24h are merged and counted, forming a timeline.
+- The original words are kept as `raw_quote`, so family can see exactly what the elder said, preventing the LLM from "filling in the blanks".
+- **Red-flag rules**: chest pain, shortness of breath, one-sided weakness/slurred speech, confusion, falls, self-harm thoughts → high-priority alerts pushed in real time.
+
+### 2.3 Family Dashboard
+
+- Today's summary (2–3 natural-language sentences: mood, discomforts mentioned, things to watch)
+- Symptom timeline (grouped by day, severity color chips, occurrence counts, original quotes)
+- Alert center (symptom / fall types; falls include a snapshot), real-time pop-ups via SSE
+- Fall-detection panel (live detection view via MJPEG + recent events)
+- Conversation history (read-only)
+
+### 2.4 Fall Detection
+
+- YOLO11-pose keypoints + state-machine rules (fall speed, torso angle, time spent on the ground).
+- Input: camera or video file; output: snapshot + alert event.
+- Optional: send the snapshot to a GPT vision model for a second opinion to reduce false positives.
+- **Exposed as an MCP server (fall-mcp)**: six tools — `get_fall_events`, `get_event_snapshot`, `get_monitor_status`, `start_monitoring` / `stop_monitoring`, `analyze_video`; Streamable HTTP (primary) + stdio (Claude Desktop).
+- "Ask AI" on the family dashboard (optional): "Did Mom fall today? Has anything been bothering her lately?" — the agent calls the fall tools over MCP plus local symptom tools and answers with both.
+
+### 2.5 Key Demo Metrics (to be filled in during Stage G)
+
+| Metric | Target | Measured |
 |---|---|---|
-| 语言与包管理 | Python 3.12 + uv | 与 rift 项目一致；跌倒检测依赖 Python 生态 |
-| Web 后端 | FastAPI + Uvicorn | 同时托管 API、页面、SSE |
-| 前端 | Jinja2 + 原生 JS + CSS | 两个页面，不引入构建工具，2 天内最省事 |
-| 实时推送 | SSE（`/api/alerts/stream`） | 单向推送足够；比 WebSocket 简单，浏览器原生重连 |
-| 存储 | SQLite + SQLAlchemy 2.x | 单机演示足够 |
-| LLM | OpenAI Chat Completions（`CHAT_MODEL`） | 对话、摘要 |
-| 结构化抽取 | OpenAI Structured Outputs（`response_format=json_schema`, strict） | 症状抽取保证 JSON 合法 |
-| ASR | OpenAI `gpt-4o-transcribe`（备选 `whisper-1`） | 口音/老人语速鲁棒性好于浏览器 Web Speech |
-| TTS | OpenAI `gpt-4o-mini-tts` | 支持 `instructions` 控制语速/语气（慢、温和） |
-| 姿态估计 | Ultralytics YOLO11n-pose | CPU 可跑实时；开箱预训练权重 |
-| 视频 | OpenCV | 读取摄像头/视频、画骨架、编码 MJPEG |
-| MCP | 官方 `mcp` Python SDK（FastMCP） | fall-mcp：Streamable HTTP（主）+ stdio（桌面客户端）；与 MJPEG 同一 Starlette 应用 |
-| 质量 | pytest、ruff | 离线单测全部使用 mock LLM |
+| Voice round-trip end-to-end latency P50 | < 4s | – |
+| Symptom-extraction eval accuracy (symptom name + red-flag) | ≥ 90% | – |
+| Red-flag recall (eval set) | 100% | – |
+| Demo-video fall detections / false positives | all detected / 0 false positives | – |
 
-> 模型名一律写在 `.env`，开工前在 OpenAI 控制台确认可用型号并更新默认值。
+---
 
-### 3.2 技术分析：语音交互链路
+## 3. Technology Choices & Technical Analysis
 
-**方案对比**
+### 3.1 Overall Tech Stack
 
-| 方案 | 延迟 | 开发成本 | 症状日志所需文本 | 结论 |
+| Layer | Choice | Notes |
+|---|---|---|
+| Language & packaging | Python 3.12 + uv | Consistent with the rift project; fall detection depends on the Python ecosystem |
+| Web backend | FastAPI + Uvicorn | Serves the API, pages, and SSE |
+| Frontend | Jinja2 + vanilla JS + CSS | Two pages, no build tooling — the least effort for a 2-day build |
+| Real-time push | SSE (`/api/alerts/stream`) | One-way push is enough; simpler than WebSocket, with native browser reconnect |
+| Storage | SQLite + SQLAlchemy 2.x | Sufficient for a single-machine demo |
+| LLM | OpenAI Chat Completions (`CHAT_MODEL`) | Chat, summaries |
+| Structured extraction | OpenAI Structured Outputs (`response_format=json_schema`, strict) | Guarantees valid JSON for symptom extraction |
+| ASR | OpenAI `gpt-4o-transcribe` (fallback `whisper-1`) | More robust to accents and older speakers' pace than browser Web Speech |
+| TTS | OpenAI `gpt-4o-mini-tts` | Supports `instructions` to control pace/tone (slow, warm) |
+| Pose estimation | Ultralytics YOLO11n-pose | Real-time on CPU; pretrained weights out of the box |
+| Video | OpenCV | Read camera/video, draw skeletons, encode MJPEG |
+| MCP | Official `mcp` Python SDK (FastMCP) | fall-mcp: Streamable HTTP (primary) + stdio (desktop clients); same Starlette app as the MJPEG stream |
+| Quality | pytest, ruff | All offline unit tests use the mock LLM |
+
+> All model names live in `.env`. Before starting, confirm available models in the OpenAI console and update the defaults.
+
+### 3.2 Technical Analysis: Voice Interaction Pipeline
+
+**Option comparison**
+
+| Option | Latency | Dev cost | Text available for the symptom log | Verdict |
 |---|---|---|---|---|
-| ① 浏览器 Web Speech API（ASR）+ `speechSynthesis`（TTS） | 低 | 最低 | 有 | ❌ 识别质量不稳定、音色机械，Safari/Chrome 行为不一致 |
-| ② **录音上传 → OpenAI 转写 → Chat → TTS（串行管线）** | 中（3–4s） | 低 | 有 | ✅ **MVP 采用** |
-| ③ OpenAI Realtime API（语音对语音，WebRTC） | 最低（<1s） | 高（会话管理、打断、工具调用、转写旁路） | 需额外开启转写 | ⏳ 第 7 章加分项 |
+| ① Browser Web Speech API (ASR) + `speechSynthesis` (TTS) | Low | Lowest | Yes | ❌ Unreliable recognition, robotic voice, inconsistent between Safari and Chrome |
+| ② **Upload recording → OpenAI transcription → Chat → TTS (sequential pipeline)** | Medium (3–4s) | Low | Yes | ✅ **Chosen for the MVP** |
+| ③ OpenAI Realtime API (speech-to-speech, WebRTC) | Lowest (<1s) | High (session management, barge-in, tool calls, side-channel transcription) | Requires enabling transcription separately | ⏳ Stretch goal in Chapter 7 |
 
-**延迟预算（方案 ②）**
+**Latency budget (option ②)**
 
-| 环节 | 预估 | 优化手段 |
+| Step | Estimate | Optimization |
 |---|---|---|
-| 录音上传（webm/opus，~5s 语音 ≈ 50KB） | 0.1–0.3s | opus 压缩 |
-| 转写 | 0.5–1.2s | 用 `gpt-4o-transcribe`；传 `language` 提示可选 |
-| Chat 回复（~60 token） | 0.8–1.5s | 限制 `max_tokens`；prompt 要求短句；非推理型 mini 模型 |
-| TTS | 0.6–1.2s | mini-tts；**先返回文字、再异步取音频** |
-| 症状抽取 | 0（异步，不在关键路径） | FastAPI `BackgroundTasks` |
-| **合计** | **≈ 2.5–4s** | 前端「在听 / 在想」动画掩盖等待 |
+| Upload recording (webm/opus, ~5s of speech ≈ 50KB) | 0.1–0.3s | Opus compression |
+| Transcription | 0.5–1.2s | Use `gpt-4o-transcribe`; optionally pass a `language` hint |
+| Chat reply (~60 tokens) | 0.8–1.5s | Cap `max_tokens`; prompt asks for short sentences; non-reasoning mini model |
+| TTS | 0.6–1.2s | mini-tts; **return text first, fetch audio asynchronously** |
+| Symptom extraction | 0 (async, off the critical path) | FastAPI `BackgroundTasks` |
+| **Total** | **≈ 2.5–4s** | "Listening / thinking" animations on the frontend mask the wait |
 
-**关键实现点**
+**Key implementation points**
 
-- 前端 `MediaRecorder`（`audio/webm;codecs=opus`；Safari 回落 `audio/mp4`），按住录音、松开上传。
-- 麦克风权限要求安全上下文：演示用 `http://localhost` 或 HTTPS（手机访问需 HTTPS，见 3.9 风险）。
-- 浏览器自动播放限制：首次交互（按按钮）后播放音频不受限，满足条件。
-- `/api/chat` 返回 `{user_text, reply_text, audio_url}`；音频文件存 `data/audio/`，以静态路径返回。
+- Frontend `MediaRecorder` (`audio/webm;codecs=opus`; Safari falls back to `audio/mp4`): hold to record, release to upload.
+- Microphone access requires a secure context: use `http://localhost` or HTTPS for the demo (phones need HTTPS; see risks in 3.9).
+- Browser autoplay restrictions: audio playback after the first user interaction (pressing the button) is allowed, which our flow satisfies.
+- `/api/chat` returns `{user_text, reply_text, audio_url}`; audio files are stored in `data/audio/` and returned as static paths.
 
-### 3.3 技术分析：对话编排
+### 3.3 Technical Analysis: Conversation Orchestration
 
-- **不使用 LangGraph / Agent 框架**：老人端没有多步任务流（不同于 rift 的预约状态机），只是「人设 + 上下文 + 单次生成」，引入编排框架是负收益。
-- **上下文构成**：`system(人设 prompt + 老人画像 + 当前时间 + 近期症状摘要)` + 最近 10 轮消息 + 本轮输入。
-  - 注入「近期症状」让 Agent 能自然回访：「王阿姨，昨天您说膝盖疼，今天好点了吗？」——这是陪伴感的关键体验点。
-- **主动问候**：老人端打开时调 `POST /api/chat/greet`，按时段（早/午/晚）+ 未回访症状生成开场白。
-- **安全护栏（双层）**：
-  1. prompt 层：禁止诊断、禁止药名与剂量建议；涉及危险症状时安抚 + 建议立即联系家人/拨打 911。
-  2. 代码层：症状抽取命中危险信号 → 告警子女（不依赖 LLM 回复是否得当）。
+- **No LangGraph / agent framework**: the elder app has no multi-step task flow (unlike rift's booking state machine) — it is just "persona + context + single generation". An orchestration framework would be a net negative.
+- **Context composition**: `system(persona prompt + elder profile + current time + recent symptom summary)` + last 10 turns + current input.
+  - Injecting recent symptoms lets the agent follow up naturally: "Maggie, yesterday you said your knee hurt — is it any better today?" This is key to the feeling of companionship.
+- **Proactive greeting**: opening the elder app calls `POST /api/chat/greet`, which generates an opener based on time of day (morning/afternoon/evening) + symptoms not yet followed up on.
+- **Safety guardrails (two layers)**:
+  1. Prompt layer: no diagnosis, no drug names or dosage advice; for red-flag symptoms, reassure + suggest contacting family immediately / calling 911.
+  2. Code layer: when symptom extraction hits a red flag → alert the family (independent of whether the LLM's reply was appropriate).
 
-### 3.4 技术分析：症状抽取与日志
+### 3.4 Technical Analysis: Symptom Extraction & Logging
 
-#### 3.4.1 症状枚举（`config/symptoms.yaml`，唯一数据源）
+#### 3.4.1 Symptom Enum (`config/symptoms.yaml`, single source of truth)
 
-| canonical | 显示名 | 危险信号 |
+| canonical | Display name | Red flag |
 |---|---|---|
 | `chest_pain` | Chest pain / 胸痛胸闷 | ✅ high |
 | `shortness_of_breath` | Shortness of breath / 呼吸困难 | ✅ high |
@@ -169,12 +169,14 @@
 | `confusion` | Confusion / 意识混乱 | ✅ high |
 | `fall` | Fall / 摔倒 | ✅ high |
 | `self_harm` | Self-harm thoughts / 自伤念头 | ✅ high |
-| `dizziness` `headache` `fatigue` `insomnia` `cough` `fever` `nausea` `stomach_pain` `joint_pain` `back_pain` `low_mood` `loneliness` `memory_issue` `appetite_loss` | … | ❌（`severity=severe` 时 → medium 告警） |
-| `other` | 自由文本 `label` | ❌ |
+| `dizziness` `headache` `fatigue` `insomnia` `cough` `fever` `nausea` `stomach_pain` `joint_pain` `back_pain` `low_mood` `loneliness` `memory_issue` `appetite_loss` | … | ❌ (→ medium alert when `severity=severe`) |
+| `other` | Free-text `label` | ❌ |
 
-#### 3.4.2 抽取器输出协议（Structured Outputs, strict）
+Display names are bilingual (English / Chinese) because the elder may speak either language.
 
-输入：抽取 prompt（含枚举清单）+ 最近 3 轮对话（用于指代消解：「还是那样」「又疼了」）+ 本轮老人发言。
+#### 3.4.2 Extractor Output Contract (Structured Outputs, strict)
+
+Input: extraction prompt (including the enum list) + last 3 turns (for coreference such as "still the same", "it hurts again") + the elder's current utterance.
 
 ```json
 {
@@ -193,100 +195,100 @@
 }
 ```
 
-- 没提到症状 → `symptoms: []`（占多数，要求模型不「脑补」）。
-- 否定与他人：「我没头疼」「我老伴咳嗽」→ 不记录（prompt + 评测集覆盖）。
-- `raw_quote` 必须是原话子串，代码校验不通过则丢弃该条（防幻觉）。
-- `status=improved/resolved` 用于子女端显示「已好转」。
+- No symptom mentioned → `symptoms: []` (the majority case; the model must not "fill in the blanks").
+- Negations and other people: "I didn't have a headache", "my husband has a cough" → not recorded (covered by the prompt + eval set).
+- `raw_quote` must be a substring of the original utterance; entries that fail this code check are dropped (anti-hallucination).
+- `status=improved/resolved` lets the dashboard show "improving".
 
-#### 3.4.3 合并与告警规则（代码）
+#### 3.4.3 Merge & Alert Rules (code)
 
 ```
 for s in extraction.symptoms:
     validate(raw_quote ⊂ user_text) else drop
-    existing = find(elder, canonical, last_seen within 24h)   # other 按 label 比较
+    existing = find(elder, canonical, last_seen within 24h)   # `other` compares by label
     if existing: count += 1; last_seen = now; severity = max(...); status = s.status
     else:        insert new row
-    level = rules.alert_level(canonical, severity)           # 读 symptoms.yaml
-    if level and not recently_alerted(canonical, 2h):         # 告警去抖
+    level = rules.alert_level(canonical, severity)           # reads symptoms.yaml
+    if level and not recently_alerted(canonical, 2h):         # alert debounce
         alerts.create(type=symptom, level, content, ref=symptom_id)
 ```
 
-### 3.5 技术分析：跌倒检测
+### 3.5 Technical Analysis: Fall Detection
 
-**方案对比**
+**Option comparison**
 
-| 方案 | 效果 | 成本 | 结论 |
+| Option | Quality | Cost | Verdict |
 |---|---|---|---|
-| 单帧目标检测（Roboflow/HF 上的 YOLO fall 模型） | 易把「躺床/躺沙发」判为跌倒 | 低 | ❌ |
-| **YOLO11-pose 关键点 + 时序规则状态机** | 可解释、可调参，区分「躺下」与「摔倒」靠下落速度 | 低 | ✅ **MVP 采用** |
-| 关键点 + ST-GCN / PoseC3D（NTU `falling down` 类） | 更鲁棒 | 中（权重、依赖 mmaction2） | ⏳ 第 7 章 |
-| 多模态大模型逐帧判断 | 灵活 | 慢、贵 | 仅做**报警后二次确认**（可选） |
+| Single-frame object detection (YOLO "fall" models from Roboflow/HF) | Easily mistakes "lying in bed / on the sofa" for a fall | Low | ❌ |
+| **YOLO11-pose keypoints + temporal rule state machine** | Explainable and tunable; fall speed separates "lying down" from "falling" | Low | ✅ **Chosen for the MVP** |
+| Keypoints + ST-GCN / PoseC3D (NTU `falling down` class) | More robust | Medium (weights, mmaction2 dependency) | ⏳ Chapter 7 |
+| Multimodal LLM judging every frame | Flexible | Slow, expensive | Only as an **optional second check after an alert** |
 
-**判定状态机**（每个跟踪到的人一个实例，参数写在 `settings.yaml`）
+**Detection state machine** (one instance per tracked person; parameters in `settings.yaml`)
 
 ```
-STANDING ──(A: bbox 宽高比 > 1.2  或  躯干与竖直夹角 > 60°)──▶ 候选
-        并且 (B: 髋部中点在 ≤ 0.6s 内下降 > 0.35 × 身高)      ──▶ FALLING
-FALLING ──(持续 ≥ 3s 保持近水平 且 髋部位移 < 阈值)──▶ DOWN ⇒ 触发告警（截图）
-FALLING ──(3s 内恢复直立)──▶ STANDING（不报）
-DOWN    ──(恢复直立)──▶ STANDING；同一 track 30s 内不重复报
+STANDING ──(A: bbox aspect ratio > 1.2  or  torso angle from vertical > 60°)──▶ candidate
+        and (B: hip midpoint drops > 0.35 × body height within ≤ 0.6s)    ──▶ FALLING
+FALLING ──(stays near-horizontal ≥ 3s and hip displacement < threshold)──▶ DOWN ⇒ fire alert (snapshot)
+FALLING ──(back upright within 3s)──▶ STANDING (no alert)
+DOWN    ──(back upright)──▶ STANDING; no repeat alert for the same track within 30s
 ```
 
-- 缓慢躺下不满足 B（下落速度）→ 不报，这是区分「躺下」与「摔倒」的核心。
-- 关键点置信度 < 0.3 的帧跳过；人体框用 `model.track(persist=True)` 获得 track_id。
-- 性能：YOLO11n-pose 在笔记本 CPU 约 15–25 FPS（640 输入），演示足够；抽帧处理（每 2 帧）作为兜底。
-- 隐私：视频帧只在本地处理，不上传；仅开启二次确认时上传单张截图。
+- Slowly lying down fails condition B (fall speed) → no alert. This is the core of distinguishing "lying down" from "falling".
+- Frames with keypoint confidence < 0.3 are skipped; person boxes get a track_id from `model.track(persist=True)`.
+- Performance: YOLO11n-pose runs at ~15–25 FPS on a laptop CPU (640 input), enough for the demo; processing every 2nd frame is the fallback.
+- Privacy: video frames are processed locally and never uploaded; only a single snapshot is uploaded, and only when the second check is enabled.
 
-### 3.6 技术分析：fall-mcp 服务设计
+### 3.6 Technical Analysis: fall-mcp Service Design
 
-**为什么做成 MCP，以及边界在哪**
+**Why MCP, and where the boundary is**
 
-| 需求 | MCP 适合？ | 做法 |
+| Need | Good fit for MCP? | Approach |
 |---|---|---|
-| 实时告警（摔倒发生 → 子女端立刻弹窗） | ❌ MCP 是客户端发起的请求/响应，没有可靠的服务端主动推送给浏览器的通道 | 保留 push：`Reporter` → `POST /api/alerts` → SSE |
-| 查询历史事件、取截图、看监控状态 | ✅ | MCP tools |
-| 启停监控、切换视频源 | ✅ | MCP tools |
-| 离线分析一段视频（子女上传录像） | ✅ | MCP tool `analyze_video` |
-| 被外部 Agent 复用（Claude Desktop 里问“今天有没有摔倒”） | ✅ | stdio / Streamable HTTP |
+| Real-time alert (fall happens → dashboard pops up immediately) | ❌ MCP is client-initiated request/response, with no reliable server-to-browser push channel | Keep push: `Reporter` → `POST /api/alerts` → SSE |
+| Query past events, fetch snapshots, check monitor status | ✅ | MCP tools |
+| Start/stop monitoring, switch video source | ✅ | MCP tools |
+| Offline analysis of a video (a recording uploaded by family) | ✅ | MCP tool `analyze_video` |
+| Reuse by external agents (asking "any falls today?" in Claude Desktop) | ✅ | stdio / Streamable HTTP |
 
-**工具清单**
+**Tool list**
 
-| Tool | 参数 | 返回 | 说明 |
+| Tool | Params | Returns | Notes |
 |---|---|---|---|
-| `get_fall_events` | `since?: ISO时间`, `limit=20` | `[{event_id, ts, track_id, confidence, verified, snapshot_id}]` | 读事件存储 |
-| `get_event_snapshot` | `event_id` | `ImageContent`（JPEG）+ 文本描述 | 让多模态客户端直接“看”截图 |
-| `get_monitor_status` | – | `{running, source, fps, persons, states: {track_id: STANDING/FALLING/DOWN}, uptime_s}` | 健康检查 + 当前画面状态 |
-| `start_monitoring` | `source: "0" \| 视频路径`, `loop=true` | `{running, source}` | 启动检测线程（已运行则切换源） |
-| `stop_monitoring` | – | `{running: false}` | 停止检测线程 |
-| `analyze_video` | `path` | `{events: [...], duration_s, frames}` | 离线整段分析，不触发实时告警，结果写入事件存储（`source=offline`） |
+| `get_fall_events` | `since?: ISO time`, `limit=20` | `[{event_id, ts, track_id, confidence, verified, snapshot_id}]` | Reads the event store |
+| `get_event_snapshot` | `event_id` | `ImageContent` (JPEG) + text description | Lets multimodal clients "see" the snapshot directly |
+| `get_monitor_status` | – | `{running, source, fps, persons, states: {track_id: STANDING/FALLING/DOWN}, uptime_s}` | Health check + current scene state |
+| `start_monitoring` | `source: "0" \| video path`, `loop=true` | `{running, source}` | Starts the detection thread (switches source if already running) |
+| `stop_monitoring` | – | `{running: false}` | Stops the detection thread |
+| `analyze_video` | `path` | `{events: [...], duration_s, frames}` | Offline whole-video analysis; does not fire real-time alerts; results written to the event store (`source=offline`) |
 
-- **Resource**（可选）：`fall://live/snapshot` —— 当前帧截图。
-- **事件存储**：`data/fall_events.jsonl`（追加写）+ 内存索引；截图 `data/snapshots/{event_id}.jpg`。fall-mcp 是事件的唯一数据源，主服务 `alert` 表只保存告警副本（含 `ref_id=event_id`）。
-- **进程形态**：一个 Starlette 应用挂载三样东西——`/mcp`（FastMCP Streamable HTTP）、`/stream`（MJPEG）、`/healthz`；检测循环在后台线程，由 `start/stop_monitoring` 控制，与 MCP 请求通过线程安全的 `MonitorController` 交互。
-- **stdio 模式**：`python -m fall_detector.server --stdio` 供 Claude Desktop 配置；stdio 模式下不启 MJPEG。
-- **错误映射**：视频不存在 / 摄像头打不开 / 未在运行 → MCP tool error（`isError=true` + 可读信息），不抛裸异常。
+- **Resource** (optional): `fall://live/snapshot` — snapshot of the current frame.
+- **Event store**: `data/fall_events.jsonl` (append-only) + in-memory index; snapshots at `data/snapshots/{event_id}.jpg`. fall-mcp is the single source of truth for events; the main service's `alert` table only keeps alert copies (with `ref_id=event_id`).
+- **Process layout**: one Starlette app mounts three things — `/mcp` (FastMCP Streamable HTTP), `/stream` (MJPEG), `/healthz`. The detection loop runs on a background thread controlled by `start/stop_monitoring`, and interacts with MCP requests through a thread-safe `MonitorController`.
+- **stdio mode**: `python -m fall_detector.server --stdio` for Claude Desktop configuration; MJPEG is not started in stdio mode.
+- **Error mapping**: missing video / camera won't open / not running → MCP tool error (`isError=true` + readable message), never a bare exception.
 
-**子女端问答 Agent（可选，E5）**
+**Family Q&A agent (optional, E5)**
 
 ```
-family.js 输入问题 → POST /api/family/ask
-  → OpenAI Chat（tools = fall-mcp 工具列表(经 MCP client 转换) + 本地工具 get_symptoms / get_today_summary）
-  → tool_calls → MCP client (Streamable HTTP :8001/mcp) / 本地函数
-  → 最终回答（引用事件时间与截图链接）
+family.js question → POST /api/family/ask
+  → OpenAI Chat (tools = fall-mcp tool list (converted via MCP client) + local tools get_symptoms / get_today_summary)
+  → tool_calls → MCP client (Streamable HTTP :8001/mcp) / local functions
+  → final answer (citing event times and snapshot links)
 ```
 
-### 3.7 模型层设计
+### 3.7 Model Layer Design
 
-- `LLMClient` 薄封装 OpenAI SDK：`chat()`、`extract_json(schema)`、`transcribe()`、`tts()`、`vision_check()`。
-- `MockLLMClient` 实现同一接口，按 fixture 返回，用于单测与无网演示兜底（`LLM_PROVIDER=mock`）。
-- 超时与降级：
-  - 转写失败 → 前端提示「没听清，再说一次好吗？」（并提供文字输入框兜底）
-  - Chat 失败 → 固定安抚话术
-  - TTS 失败 → 只显示文字
-  - 抽取失败 → 记录日志，不影响对话
-- 密钥只从环境变量读取，`.env` 在 `.gitignore`。
+- `LLMClient` is a thin wrapper around the OpenAI SDK: `chat()`, `extract_json(schema)`, `transcribe()`, `tts()`, `vision_check()`.
+- `MockLLMClient` implements the same interface and returns fixtures; used for unit tests and as an offline demo fallback (`LLM_PROVIDER=mock`).
+- Timeouts and degradation:
+  - Transcription fails → frontend prompt "Sorry, I didn't catch that — could you say it again?" (with a text input as fallback)
+  - Chat fails → fixed reassuring reply
+  - TTS fails → show text only
+  - Extraction fails → log it; chat is unaffected
+- Secrets are read only from environment variables; `.env` is in `.gitignore`.
 
-### 3.8 数据模型（SQLite）
+### 3.8 Data Model (SQLite)
 
 ```sql
 elder(id, name, nickname, language, profile_text, created_at)
@@ -297,75 +299,75 @@ alert(id, elder_id, type[symptom|fall], level[high|medium], title, content,
       snapshot_path, ref_id, created_at, is_read)
 ```
 
-### 3.9 关键风险与对策
+### 3.9 Key Risks & Mitigations
 
-| 风险 | 影响 | 对策 |
+| Risk | Impact | Mitigation |
 |---|---|---|
-| 手机访问 `http://局域网IP` 无法录音（非安全上下文） | 老人端演示失败 | 演示用笔记本 `localhost`；或 `ngrok`/Cloudflare Tunnel 提供 HTTPS |
-| 会场网络差，OpenAI 超时 | 全链路卡住 | 手机热点备份；`LLM_PROVIDER=mock` 兜底回放 |
-| LLM 抽取漏掉危险信号 | 核心卖点失效 | 评测集覆盖 + prompt 示例；演示话术提前跑通 |
-| LLM 回复越界（诊断、药物） | 伦理与合规风险 | prompt 护栏 + 页面免责声明；评测集加越界用例 |
-| 跌倒检测误报/漏报 | 演示翻车 | 预录视频 + 调好的参数；现场实时摄像头只作展示 |
-| 两人接口对不上 | 联调耗时 | 唯一契约 `POST /api/alerts` 在 D1 上午冻结 |
+| Phone accessing `http://<LAN IP>` can't record (not a secure context) | Elder-app demo fails | Demo on the laptop via `localhost`; or use `ngrok` / Cloudflare Tunnel for HTTPS |
+| Poor venue network, OpenAI timeouts | Whole pipeline stalls | Phone hotspot backup; `LLM_PROVIDER=mock` replay fallback |
+| LLM extraction misses a red flag | Core selling point fails | Eval-set coverage + prompt examples; rehearse demo lines in advance |
+| LLM reply oversteps (diagnosis, medication) | Ethical/compliance risk | Prompt guardrails + on-page disclaimer; add overstep cases to the eval set |
+| Fall-detection false positives/negatives | Demo failure | Pre-recorded videos + tuned parameters; live camera for show only |
+| A and B's interfaces don't match | Integration time sink | The single contract `POST /api/alerts` is frozen on D1 morning |
 
 ---
 
-## 4. 测试方案
+## 4. Testing Strategy
 
-### 4.1 设计理念
+### 4.1 Philosophy
 
-每个任务都有明确的验收命令。规则类代码（症状合并、告警规则、跌倒状态机）零 LLM 依赖，用表驱动单测锁死；LLM 相关能力用小型评测集手动跑；演示路径用剧本逐条彩排。
+Every task has an explicit acceptance command. Rule code (symptom merging, alert rules, fall state machine) has zero LLM dependency and is locked down with table-driven unit tests; LLM capabilities are run manually against a small eval set; the demo path is rehearsed script step by script step.
 
-### 4.2 三层评测
+### 4.2 Three Evaluation Layers
 
-| 层 | 对象 | 数据 | 评分 | 运行时机 |
+| Layer | Target | Data | Scoring | When |
 |---|---|---|---|---|
-| **L1 组件** | 症状合并、告警规则与去抖、`raw_quote` 校验、跌倒状态机、事件存储、fall-mcp 工具（进程内 client）、API 契约 | 表驱动用例；跌倒用合成关键点序列 | 精确断言 | 每次提交（`pytest -m unit`） |
-| **L2 抽取** | 症状抽取器 | `eval/extraction_cases.yaml` ≈ 30 条（中英混合，含否定、他人、无症状、危险信号） | 症状 canonical 集合精确匹配；危险信号召回必须 100% | 改 prompt 后（需 API Key） |
-| **L3 演示剧本** | 端到端流程 | 第 6 章 G2 演示脚本 | 人工逐条核对子女端结果 | D2 下午彩排 |
+| **L1 Components** | Symptom merging, alert rules & debounce, `raw_quote` check, fall state machine, event store, fall-mcp tools (in-process client), API contract | Table-driven cases; synthetic keypoint sequences for falls | Exact assertions | Every commit (`pytest -m unit`) |
+| **L2 Extraction** | Symptom extractor | `eval/extraction_cases.yaml` ≈ 30 cases (mixed English/Chinese; negations, other people, no symptom, red flags) | Exact match on the set of canonical symptoms; red-flag recall must be 100% | After prompt changes (needs API key) |
+| **L3 Demo script** | End-to-end flow | Chapter 6 G2 demo script | Manual check of dashboard results, step by step | D2 afternoon rehearsal |
 
-### 4.3 L2 用例示例
+### 4.3 L2 Case Examples
 
 ```yaml
 - say: "I've been a bit dizzy in the mornings for two days"
   expect: [dizziness]
-- say: "我今天挺好的，就是没什么胃口"
+- say: "我今天挺好的，就是没什么胃口"   # "I'm fine today, just not much appetite"
   expect: [appetite_loss]
 - say: "My husband has a bad cough, I'm fine though"
   expect: []
-- say: "胸口有点闷，喘不太上气"
+- say: "胸口有点闷，喘不太上气"         # "My chest feels tight, I can't quite catch my breath"
   expect: [chest_pain, shortness_of_breath]
   expect_alert: high
 - say: "I didn't have a headache today"
   expect: []
 ```
 
-### 4.4 测试目录
+### 4.4 Test Layout
 
 ```
 tests/
-  unit/            # L1，离线（mock LLM）
-  integration/     # FastAPI TestClient + 内存 SQLite
-  fixtures/        # mock LLM 回放、合成关键点序列
+  unit/            # L1, offline (mock LLM)
+  integration/     # FastAPI TestClient + temporary SQLite
+  fixtures/        # mock LLM replays, synthetic keypoint sequences
 eval/
   extraction_cases.yaml
   run_extraction_eval.py
 ```
 
-pytest markers：`unit`、`integration`、`llm`（需要真实 API）。
+pytest markers: `unit`, `integration`, `llm` (needs the real API).
 
 ---
 
-## 5. 系统架构与模块设计
+## 5. System Architecture & Module Design
 
-### 5.1 整体架构
+### 5.1 Overall Architecture
 
 ```
-┌─────────────────────────── 演示笔记本 (localhost) ───────────────────────────┐
+┌──────────────────────────── Demo laptop (localhost) ─────────────────────────┐
 │                                                                              │
 │  ┌────────────────── web (FastAPI :8000) ──────────────────┐                 │
-│  │ /elder  老人端（大按钮录音、自动播放）                    │                 │
-│  │ /family 子女端（摘要 / 症状 / 告警 / 跌倒面板 / 对话）     │                 │
+│  │ /elder  elder app (big record button, autoplay)         │                 │
+│  │ /family dashboard (summary/symptoms/alerts/fall/chat)   │                 │
 │  │                                                         │                 │
 │  │  chat.service ─── transcribe / chat / tts ─────────────────▶ OpenAI API   │
 │  │       │                                                 │                 │
@@ -375,22 +377,22 @@ pytest markers：`unit`、`integration`、`llm`（需要真实 API）。
 │  │  SQLite: data/app.db                                    │                 │
 │  └───────────────────────────▲─────────────────────────────┘                 │
 │      push: POST /api/alerts  │        │ pull: MCP (Streamable HTTP)          │
-│                              │        ▼ (E5 问答 Agent，可选)                  │
-│  ┌─────────── fall-mcp (独立进程 :8001, Starlette) ─────────┐                 │
+│                              │        ▼ (E5 Q&A agent, optional)             │
+│  ┌─────────── fall-mcp (separate process :8001, Starlette) ─┐                │
 │  │ /mcp     FastMCP tools: get_fall_events / get_event_snapshot /            │
 │  │          get_monitor_status / start|stop_monitoring / analyze_video       │
-│  │ /stream  MJPEG（子女端 <img> 嵌入）   /healthz            │                 │
-│  │ MonitorController ── 后台线程:                           │                 │
-│  │   OpenCV 摄像头 / demo.mp4 → YOLO11n-pose.track          │                 │
-│  │   → FallStateMachine → EventStore(jsonl + snapshots)     │                 │
-│  │   → (可选) vision_check ────────────────────────────────────▶ OpenAI API   │
-│  │   → Reporter ── push ─┘                                  │                 │
+│  │ /stream  MJPEG (embedded via <img> in dashboard)  /healthz│               │
+│  │ MonitorController ── background thread:                  │                │
+│  │   OpenCV camera / demo.mp4 → YOLO11n-pose.track          │                │
+│  │   → FallStateMachine → EventStore(jsonl + snapshots)     │                │
+│  │   → (optional) vision_check ─────────────────────────────────▶ OpenAI API │
+│  │   → Reporter ── push ─┘                                  │                │
 │  └──────────────────────────────────────────────────────────┘                │
 └──────────────────────────────────────────────────────────────────────────────┘
-  Claude Desktop / Cursor ── stdio / Streamable HTTP ──▶ fall-mcp（同一套工具）
+  Claude Desktop / Cursor ── stdio / Streamable HTTP ──▶ fall-mcp (same tools)
 ```
 
-### 5.2 目录结构
+### 5.2 Directory Layout
 
 ```
 AI-for-elder/
@@ -400,20 +402,20 @@ AI-for-elder/
 ├── README.md
 ├── DEV_SPEC.md
 ├── config/
-│   ├── settings.yaml             # 模型、上下文轮数、告警去抖、跌倒参数
-│   ├── symptoms.yaml             # 唯一数据源：症状枚举、显示名、危险等级
+│   ├── settings.yaml             # models, context turns, alert debounce, fall parameters
+│   ├── symptoms.yaml             # single source of truth: symptom enum, display names, alert levels
 │   └── prompts/
-│       ├── companion.txt         # 老人端人设
+│       ├── companion.txt         # elder-app persona
 │       ├── greet.txt
 │       ├── extract_symptoms.txt
 │       ├── daily_summary.txt
 │       └── fall_verify.txt
 ├── src/
-│   ├── elder_companion/          # 负责人 A
+│   ├── elder_companion/          # owner: A
 │   │   ├── settings.py
 │   │   ├── db.py                 # engine / session
 │   │   ├── models.py             # Elder / Message / SymptomLog / Alert
-│   │   ├── seed.py               # 演示老人画像 + 可选历史数据
+│   │   ├── seed.py               # demo elder profile + optional history
 │   │   ├── llm/{client.py, mock.py}
 │   │   ├── chat/{service.py, context.py}
 │   │   ├── symptoms/{schema.py, extractor.py, merge.py, rules.py}
@@ -424,66 +426,66 @@ AI-for-elder/
 │   │       ├── routes/{pages.py, chat.py, family.py, alerts.py}
 │   │       ├── templates/{elder.html, family.html}
 │   │       └── static/{elder.js, family.js, style.css}
-│   └── fall_detector/            # 负责人 B（fall-mcp）
-│       ├── pose.py               # YOLO11-pose 封装，输出每帧 tracks + keypoints
-│       ├── rules.py              # 特征计算 + FallStateMachine（纯函数，可单测）
-│       ├── events.py             # EventStore：jsonl 追加 + 内存索引 + 截图路径
-│       ├── monitor.py            # MonitorController：检测线程启停、切源、状态快照、最新帧
-│       ├── reporter.py           # POST /api/alerts + 可选视觉复核
-│       ├── mcp_tools.py          # FastMCP 工具定义（6 个 tool + 1 个 resource）
-│       ├── stream.py             # MJPEG 生成器
-│       ├── server.py             # Starlette 组装：/mcp、/stream、/healthz；--stdio 模式
-│       └── __main__.py           # python -m fall_detector --source demo/videos/fall_01.mp4（纯 CLI 调试）
-├── docs/mcp_desktop.md           # fall-mcp 接入 Claude Desktop
-├── demo/videos/                  # 预录跌倒 / 躺下 / 正常走动视频
-├── data/                         # app.db, audio/, snapshots/（git 忽略）
+│   └── fall_detector/            # owner: B (fall-mcp)
+│       ├── pose.py               # YOLO11-pose wrapper; per-frame tracks + keypoints
+│       ├── rules.py              # feature computation + FallStateMachine (pure functions, unit-testable)
+│       ├── events.py             # EventStore: jsonl append + in-memory index + snapshot paths
+│       ├── monitor.py            # MonitorController: thread start/stop, source switching, status, latest frame
+│       ├── reporter.py           # POST /api/alerts + optional vision check
+│       ├── mcp_tools.py          # FastMCP tool definitions (6 tools + 1 resource)
+│       ├── stream.py             # MJPEG generator
+│       ├── server.py             # Starlette assembly: /mcp, /stream, /healthz; --stdio mode
+│       └── __main__.py           # python -m fall_detector --source demo/videos/fall_01.mp4 (CLI debugging)
+├── docs/mcp_desktop.md           # connecting fall-mcp to Claude Desktop
+├── demo/videos/                  # pre-recorded fall / lying-down / walking videos
+├── data/                         # app.db, audio/, snapshots/ (git-ignored)
 ├── eval/{extraction_cases.yaml, run_extraction_eval.py}
 └── tests/{unit, integration, fixtures}/
 ```
 
-### 5.3 模块依赖规则
+### 5.3 Module Dependency Rules
 
 ```
 web ──▶ chat, symptoms, alerts, summary ──▶ llm, models
-symptoms.rules / symptoms.merge ──▶ 纯 Python（不依赖 llm / 网络）
-fall_detector ──▶ 不 import elder_companion；只通过 HTTP 与主服务交互
-fall_detector.rules ──▶ 纯 Python（输入关键点序列，输出事件），可离线单测
-fall_detector.mcp_tools ──▶ 只调用 MonitorController / EventStore，不直接碰 YOLO
-elder_companion.family_agent（E5）──▶ 只通过 MCP client 访问跌倒数据，不读 fall_events.jsonl
+symptoms.rules / symptoms.merge ──▶ pure Python (no llm / network)
+fall_detector ──▶ never imports elder_companion; talks to the main service only over HTTP
+fall_detector.rules ──▶ pure Python (keypoint sequences in, events out), unit-testable offline
+fall_detector.mcp_tools ──▶ only calls MonitorController / EventStore, never touches YOLO directly
+elder_companion.family_agent (E5) ──▶ accesses fall data only through the MCP client, never reads fall_events.jsonl
 ```
 
-### 5.4 数据流
+### 5.4 Data Flows
 
-**老人说一句话**：
-`elder.js 录音` → `POST /api/chat (multipart audio)` → `transcribe` → 存 `message(user)` → `context.build`（画像 + 近期症状 + 最近 10 轮）→ `chat` → 存 `message(assistant)` → 返回 `{user_text, reply_text}` → 前端显示文字 → `GET /api/tts/{message_id}` 取音频播放；同时 `BackgroundTask: extractor → merge → rules → alerts.create → bus.publish`。
+**The elder says something**:
+`elder.js recording` → `POST /api/chat (multipart audio)` → `transcribe` → save `message(user)` → `context.build` (profile + recent symptoms + last 10 turns) → `chat` → save `message(assistant)` → return `{user_text, reply_text}` → frontend shows text → `GET /api/tts/{message_id}` fetches audio and plays it; meanwhile `BackgroundTask: extractor → merge → rules → alerts.create → bus.publish`.
 
-**子女端实时告警**：
-`family.js EventSource('/api/alerts/stream')` ← `alerts.bus`（进程内 `asyncio.Queue` 广播）← `alerts.create`（症状规则 / 跌倒上报）。
+**Real-time alerts on the dashboard**:
+`family.js EventSource('/api/alerts/stream')` ← `alerts.bus` (in-process `asyncio.Queue` broadcast) ← `alerts.create` (symptom rules / fall reports).
 
-**跌倒告警**：
-`fall_detector` 帧循环 → `pose.track` → `FallStateMachine.update` → `DOWN` 事件 → 截图保存到共享 `data/snapshots/` → （可选 `vision_check`）→ `POST /api/alerts` → SSE → 子女端弹窗 + 截图。
+**Fall alert**:
+`fall_detector` frame loop → `pose.track` → `FallStateMachine.update` → `DOWN` event → snapshot saved to the shared `data/snapshots/` → (optional `vision_check`) → `POST /api/alerts` → SSE → dashboard pop-up + snapshot.
 
-**今日摘要**：
-`GET /api/summary/today` → 当日 messages + symptom_logs → `daily_summary` prompt → 缓存 10 分钟。
+**Today's summary**:
+`GET /api/summary/today` → today's messages + symptom_logs → `daily_summary` prompt → cached for 10 minutes.
 
-### 5.5 API 契约
+### 5.5 API Contract
 
-| Method | Path | 请求 / 响应 | 负责 |
+| Method | Path | Request / Response | Owner |
 |---|---|---|---|
-| GET | `/elder`、`/family` | 页面 | A |
-| POST | `/api/chat` | multipart `audio` 或 JSON `{text}` → `{message_id, user_text, reply_text}` | A |
+| GET | `/elder`, `/family` | Pages | A |
+| POST | `/api/chat` | multipart `audio` or JSON `{text}` → `{message_id, user_text, reply_text}` | A |
 | POST | `/api/chat/greet` | → `{message_id, reply_text}` | A |
 | GET | `/api/tts/{message_id}` | → `audio/mpeg` | A |
-| GET | `/api/messages?limit=` | 对话记录 | A |
-| GET | `/api/symptoms?days=7` | 症状日志（按天分组） | A |
+| GET | `/api/messages?limit=` | Conversation history | A |
+| GET | `/api/symptoms?days=7` | Symptom log (grouped by day) | A |
 | GET | `/api/summary/today` | `{summary, generated_at}` | A |
-| GET | `/api/alerts` | 告警列表 | A |
-| POST | `/api/alerts` | **跌倒服务调用（唯一跨进程契约，D1 上午冻结）** | A |
-| POST | `/api/alerts/{id}/read` | 标记已读 | A |
-| GET | `/api/alerts/stream` | SSE，`event: alert`，`data: Alert JSON` | A |
-| POST | `/api/family/ask`（可选 E5） | `{question}` → `{answer, tool_calls}` | A |
-| GET | `:8001/stream` | MJPEG 检测画面 | B |
-| MCP | `:8001/mcp` | fall-mcp 工具（见 3.6）；stdio：`python -m fall_detector.server --stdio` | B |
+| GET | `/api/alerts` | Alert list | A |
+| POST | `/api/alerts` | **Called by the fall service (the only cross-process contract, frozen on D1 morning)** | A |
+| POST | `/api/alerts/{id}/read` | Mark as read | A |
+| GET | `/api/alerts/stream` | SSE, `event: alert`, `data: Alert JSON` | A |
+| POST | `/api/family/ask` (optional E5) | `{question}` → `{answer, tool_calls}` | A |
+| GET | `:8001/stream` | MJPEG detection view | B |
+| MCP | `:8001/mcp` | fall-mcp tools (see 3.6); stdio: `python -m fall_detector.server --stdio` | B |
 
 ```json
 // POST /api/alerts
@@ -491,10 +493,10 @@ elder_companion.family_agent（E5）──▶ 只通过 MCP client 访问跌倒�
  "content": "Person down for 3s in living room", "snapshot_path": "snapshots/20261001_101530.jpg"}
 ```
 
-### 5.6 配置驱动
+### 5.6 Configuration-Driven
 
 ```yaml
-# config/settings.yaml（节选）
+# config/settings.yaml (excerpt)
 llm:
   provider: ${LLM_PROVIDER:-openai}          # openai | mock
   chat_model: ${CHAT_MODEL:-gpt-4.1-mini}
@@ -524,40 +526,40 @@ fall:
     port: 8001
     events_path: data/fall_events.jsonl
     snapshots_dir: data/snapshots
-    autostart_source: demo/videos/fall_01.mp4   # 启动即开始监控；null 表示等 start_monitoring
+    autostart_source: demo/videos/fall_01.mp4   # start monitoring on launch; null = wait for start_monitoring
 ```
 
 ---
 
-## 6. 项目排期（开发阶段）
+## 6. Project Schedule (Development Stages)
 
-> 原则：每个任务 ≈ 0.5–1.5h 可验收；完成后在标题与进度表标 ✅。任务格式：负责人 / 目标 / 修改文件 / 实现类与函数 / 验收标准 / 测试方法。
+> Principles: each task is ≈ 0.5–1.5h and independently verifiable; when done, mark ✅ in its heading and in the progress table. Task format: Owner / Goal / Files / Classes & functions / Acceptance criteria / How to test.
 
-### 阶段总览（大阶段 → 目的）
+### Stage Overview (stage → purpose)
 
-| 阶段 | 负责 | 目的 | 时间 | 里程碑 |
+| Stage | Owner | Purpose | When | Milestone |
 |---|---|---|---|---|
-| A 工程骨架 | A | 可启动、可配置、DB 就绪、契约冻结 | D1 上午 | 契约冻结 |
-| B 对话核心 | A | 文本对话 + 人设 + 上下文 | D1 上午 | |
-| C 语音链路 | A | 老人端语音对话 | D1 下午 | |
-| D 症状日志 | A | 抽取 → 合并 → 告警 | D1 下午–晚 | **M1：说一句话 → 子女端出现症状** |
-| E 子女端 | A（B 样式） | 摘要、时间线、告警 SSE、面板；可选 MCP 问答 | D2 上午 | |
-| F 跌倒检测（fall-mcp） | B | 视频 → 关键点 → 状态机 → 事件/告警 → 画面 → MCP 工具 | D1 全天 – D2 上午 | **M2：播放视频 → 子女端弹跌倒告警**；**M3：MCP 工具可被 Claude Desktop 调用** |
-| G 收尾 | A + B | UI 打磨、评测、演示脚本、彩排 | D2 下午 | **交付** |
+| A Project skeleton | A | Runnable, configurable, DB ready, contract frozen | D1 morning | Contract frozen |
+| B Chat core | A | Text chat + persona + context | D1 morning | |
+| C Voice pipeline | A | Voice chat in the elder app | D1 afternoon | |
+| D Symptom log | A | Extract → merge → alert | D1 afternoon–evening | **M1: say one sentence → symptom shows up on the dashboard** |
+| E Family dashboard | A (B: styling) | Summary, timeline, SSE alerts, panels; optional MCP Q&A | D2 morning | |
+| F Fall detection (fall-mcp) | B | Video → keypoints → state machine → events/alerts → live view → MCP tools | D1 all day – D2 morning | **M2: play video → fall alert on the dashboard**; **M3: MCP tools callable from Claude Desktop** |
+| G Wrap-up | A + B | UI polish, evals, demo script, rehearsal | D2 afternoon | **Delivery** |
 
-### 时间线（两人并行）
+### Timeline (two people in parallel)
 
-| | A（功能） | B（视觉 / 前端） |
+| | A (features) | B (vision / frontend) |
 |---|---|---|
-| **D1 上午** | A1–A3、B1–B3 | F1–F2（跑通 pose、准备演示视频） |
-| **D1 下午** | C1–C3、D1–D2 | F3–F4（状态机 + 单测） |
-| **D1 晚** | D3–D4 → **M1** | F5（事件存储 + 上报）联调契约 |
-| **D2 上午** | E1–E4；E5（可选，F7 完成后） | F6（MJPEG）→ **M2**；F7–F8（MCP）→ **M3**；F9（可选） |
-| **D2 下午** | G3、G4；协助 G1 | G1（样式）、G2、G4 |
+| **D1 morning** | A1–A3, B1–B3 | F1–F2 (get pose running, prepare demo videos) |
+| **D1 afternoon** | C1–C3, D1–D2 | F3–F4 (state machine + unit tests) |
+| **D1 evening** | D3–D4 → **M1** | F5 (event store + reporting), integrate against the contract |
+| **D2 morning** | E1–E4; E5 (optional, after F7) | F6 (MJPEG) → **M2**; F7–F8 (MCP) → **M3**; F9 (optional) |
+| **D2 afternoon** | G3, G4; help with G1 | G1 (styling), G2, G4 |
 
-### 📊 进度跟踪表 (Progress Tracking)
+### 📊 Progress Tracking
 
-| 阶段 | 任务 | 状态 |
+| Stage | Tasks | Status |
 |---|---|---|
 | A | A1 A2 A3 | ✅⬜⬜ |
 | B | B1 B2 B3 | ⬜⬜⬜ |
@@ -567,329 +569,329 @@ fall:
 | F | F1 F2 F3 F4 F5 F6 F7 F8 F9* | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ |
 | G | G1 G2 G3 G4 | ⬜⬜⬜⬜ |
 
-### 📈 总体进度
+### 📈 Overall Progress
 
-`1 / 31`（* 为可选任务，不计入交付门槛）
-
----
-
-## 阶段 A：工程骨架（目标：可启动、可配置、契约冻结）
-
-### A1：uv 项目与目录骨架 ✅
-- **负责人**：A
-- **目标**：按 5.2 创建目录与 `pyproject.toml`（fastapi、uvicorn、sqlalchemy、openai、pydantic、pyyaml、python-multipart、jinja2、sse-starlette、mcp（E5 客户端与 fall-mcp 服务端共用）；可选组 `vision`: ultralytics、opencv-python）。
-- **修改文件**：`pyproject.toml`、`.gitignore`、`.env.example`、`README.md`、`src/**/__init__.py`。
-- **验收标准**：`uv sync` 成功；`uv run python -c "import elder_companion, fall_detector"` 通过。
-- **测试方法**：`uv run pytest -q`（空测试集通过）。
-
-### A2：Settings 加载
-- **负责人**：A
-- **目标**：读取 `config/settings.yaml`，支持 `${ENV:-default}` 展开；`.env` 自动加载；缺 `OPENAI_API_KEY` 且 `provider=openai` 时启动报错。
-- **修改文件**：`src/elder_companion/settings.py`、`config/settings.yaml`、`tests/unit/test_settings.py`。
-- **实现类/函数**：`Settings`（Pydantic）、`load_settings(path) -> Settings`。
-- **验收标准**：环境变量覆盖默认值生效；缺 key 报出变量名。
-- **测试方法**：`uv run pytest -q tests/unit/test_settings.py`。
-
-### A3：数据模型、种子与 API 契约冻结
-- **负责人**：A（与 B 确认契约）
-- **目标**：建立 4 张表；种子写入 1 位演示老人（姓名、昵称、语言、画像：年龄、独居、高血压、爱好）；FastAPI 空壳启动，`POST /api/alerts` 先实现（让 B 能尽早联调）。
-- **修改文件**：`db.py`、`models.py`、`seed.py`、`web/app.py`、`web/routes/alerts.py`、`alerts/service.py`。
-- **实现类/函数**：`Elder`、`Message`、`SymptomLog`、`Alert`；`init_db()`、`seed_demo()`；`AlertIn` / `AlertOut` schema；`create_alert()`。
-- **验收标准**：`uv run uvicorn elder_companion.web.app:app` 启动；`curl -X POST /api/alerts` 返回 201 并入库。
-- **测试方法**：`uv run pytest -q tests/integration/test_alerts_api.py`。
+`1 / 31` (* = optional task, not required for delivery)
 
 ---
 
-## 阶段 B：对话核心（目标：文本对话有温度）
+## Stage A: Project Skeleton (goal: runnable, configurable, contract frozen)
 
-### B1：LLMClient 与 Mock
-- **负责人**：A
-- **目标**：封装 `chat(messages)`、`extract_json(messages, schema)`、`transcribe(file)`、`tts(text) -> bytes`、`vision_check(image, prompt)`；Mock 实现同接口（按关键词匹配 fixture 返回）；统一超时与异常类型 `LLMError`。
-- **修改文件**：`llm/client.py`、`llm/mock.py`、`tests/unit/test_llm_mock.py`、`tests/fixtures/mock_llm.yaml`。
-- **实现类/函数**：`BaseLLMClient`、`OpenAIClient`、`MockLLMClient`、`get_llm(settings)`。
-- **验收标准**：`LLM_PROVIDER=mock` 下全部接口可离线返回。
-- **测试方法**：`uv run pytest -q tests/unit/test_llm_mock.py`；手动 `uv run python -m elder_companion.llm.client --ping`（真实 key）。
+### A1: uv project and directory skeleton ✅
+- **Owner**: A
+- **Goal**: create the directories from 5.2 and `pyproject.toml` (fastapi, uvicorn, sqlalchemy, openai, pydantic, pyyaml, python-multipart, jinja2, sse-starlette, mcp (shared by the E5 client and the fall-mcp server); optional `vision` extra: ultralytics, opencv-python).
+- **Files**: `pyproject.toml`, `.gitignore`, `.env.example`, `README.md`, `src/**/__init__.py`.
+- **Acceptance**: `uv sync` succeeds; `uv run python -c "import elder_companion, fall_detector"` passes.
+- **How to test**: `uv run pytest -q` (empty suite passes).
 
-### B2：人设 Prompt 与上下文构建
-- **负责人**：A
-- **目标**：编写 `companion.txt`（温和、短句、一次一问、跟随语言、禁止诊断与药物、危险情况建议联系家人/911）；`build_context()` 拼接画像 + 当前时间 + 近 48h 未解决症状 + 最近 10 轮。
-- **修改文件**：`config/prompts/companion.txt`、`config/prompts/greet.txt`、`chat/context.py`、`tests/unit/test_context.py`。
-- **实现类/函数**：`build_context(elder, history, recent_symptoms, now) -> list[dict]`。
-- **验收标准**：单测断言上下文包含画像、症状回访信息、轮数截断正确。
-- **测试方法**：`uv run pytest -q tests/unit/test_context.py`。
+### A2: Settings loading
+- **Owner**: A
+- **Goal**: read `config/settings.yaml` with `${ENV:-default}` expansion; auto-load `.env`; fail at startup if `OPENAI_API_KEY` is missing and `provider=openai`.
+- **Files**: `src/elder_companion/settings.py`, `config/settings.yaml`, `tests/unit/test_settings.py`.
+- **Classes/functions**: `Settings` (Pydantic), `load_settings(path) -> Settings`.
+- **Acceptance**: environment variables override defaults; a missing key error names the variable.
+- **How to test**: `uv run pytest -q tests/unit/test_settings.py`.
 
-### B3：文本对话接口
-- **负责人**：A
-- **目标**：`POST /api/chat`（JSON `{text}`）与 `POST /api/chat/greet`；消息落库；LLM 失败返回固定安抚话术。
-- **修改文件**：`chat/service.py`、`web/routes/chat.py`、`tests/integration/test_chat_api.py`。
-- **实现类/函数**：`ChatService.reply(elder_id, text) -> ChatResult`、`ChatService.greet(elder_id)`。
-- **验收标准**：curl 发送文本得到中文/英文对应回复；消息表有两条记录。
-- **测试方法**：`uv run pytest -q tests/integration/test_chat_api.py`（mock）；手动真实 API 聊 5 轮检查人设。
-
----
-
-## 阶段 C：语音链路（目标：老人端能说能听）
-
-### C1：语音转写
-- **负责人**：A
-- **目标**：`/api/chat` 支持 multipart `audio`（webm / mp4 / wav），调用转写后走 B3 流程；空转写或过短返回 `{"need_retry": true}`。
-- **修改文件**：`web/routes/chat.py`、`chat/service.py`、`tests/integration/test_chat_audio.py`。
-- **实现类/函数**：`ChatService.reply_audio(elder_id, upload) -> ChatResult`。
-- **验收标准**：上传 `tests/fixtures/hello.webm` 返回正确 `user_text`（真实 API）；mock 下流程通过。
-- **测试方法**：`uv run pytest -q tests/integration/test_chat_audio.py`。
-
-### C2：TTS
-- **负责人**：A
-- **目标**：`GET /api/tts/{message_id}` 生成并缓存 mp3（`data/audio/{id}.mp3`），带 `tts_instructions`（慢速、温和）；失败返回 204，前端只显示文字。
-- **修改文件**：`web/routes/chat.py`、`chat/service.py`。
-- **实现类/函数**：`ChatService.synthesize(message_id) -> Path`。
-- **验收标准**：浏览器直接打开该 URL 可播放；二次请求命中缓存。
-- **测试方法**：手动；`tests/integration/test_tts.py`（mock 返回静音 mp3）。
-
-### C3：老人端页面
-- **负责人**：A（B 在 G1 打磨样式）
-- **目标**：`/elder` 页面——大圆按钮（按住说话 / 点击切换两种模式）、状态提示（在听 / 在想 / 在说）、最近 3 条对话气泡、字号 ≥ 24px、高对比度；进入页面点击「开始聊天」触发 greet 并解锁音频播放；隐藏的文字输入框兜底。
-- **修改文件**：`web/templates/elder.html`、`web/static/elder.js`、`web/static/style.css`、`web/routes/pages.py`。
-- **实现类/函数**：`startRecording()`、`stopAndSend()`、`playReply(messageId)`、`setStatus(state)`。
-- **验收标准**：Chrome + Safari（笔记本）`localhost` 下完成一轮语音对话；端到端 < 5s。
-- **测试方法**：手动；记录 5 轮延迟。
+### A3: Data model, seed data, and API contract freeze
+- **Owner**: A (confirm the contract with B)
+- **Goal**: create the 4 tables; seed one demo elder (name, nickname, language, profile: age, lives alone, high blood pressure, hobbies); bring up an empty FastAPI shell and implement `POST /api/alerts` first (so B can integrate early).
+- **Files**: `db.py`, `models.py`, `seed.py`, `web/app.py`, `web/routes/alerts.py`, `alerts/service.py`.
+- **Classes/functions**: `Elder`, `Message`, `SymptomLog`, `Alert`; `init_db()`, `seed_demo()`; `AlertIn` / `AlertOut` schemas; `create_alert()`.
+- **Acceptance**: `uv run uvicorn elder_companion.web.app:app` starts; `curl -X POST /api/alerts` returns 201 and the row is stored.
+- **How to test**: `uv run pytest -q tests/integration/test_alerts_api.py`.
 
 ---
 
-## 阶段 D：症状日志（目标：M1 —— 说一句话，子女端出现症状）
+## Stage B: Chat Core (goal: warm text chat)
 
-### D1：症状枚举与 Schema
-- **负责人**：A
-- **目标**：`config/symptoms.yaml`（canonical、中英显示名、alert 等级）；Pydantic `SymptomItem` / `SymptomExtraction`，导出 JSON Schema 供 Structured Outputs 使用，`canonical` 枚举从 yaml 生成。
-- **修改文件**：`config/symptoms.yaml`、`symptoms/schema.py`、`tests/unit/test_symptom_schema.py`。
-- **验收标准**：枚举外的 canonical 校验失败；导出的 schema 满足 strict 模式要求（所有字段 required、`additionalProperties: false`）。
-- **测试方法**：`uv run pytest -q tests/unit/test_symptom_schema.py`。
+### B1: LLMClient and mock
+- **Owner**: A
+- **Goal**: wrap `chat(messages)`, `extract_json(messages, schema)`, `transcribe(file)`, `tts(text) -> bytes`, `vision_check(image, prompt)`; a mock with the same interface (returns fixtures matched by keyword); unified timeouts and a common `LLMError` exception type.
+- **Files**: `llm/client.py`, `llm/mock.py`, `tests/unit/test_llm_mock.py`, `tests/fixtures/mock_llm.yaml`.
+- **Classes/functions**: `BaseLLMClient`, `OpenAIClient`, `MockLLMClient`, `get_llm(settings)`.
+- **Acceptance**: with `LLM_PROVIDER=mock`, every method returns offline.
+- **How to test**: `uv run pytest -q tests/unit/test_llm_mock.py`; manually `uv run python -m elder_companion.llm.client --ping` (real key).
 
-### D2：抽取器
-- **负责人**：A
-- **目标**：`extract_symptoms.txt`（枚举清单、否定/他人不记录、`raw_quote` 必须原话、无症状返回空、5 个 few-shot）；`SymptomExtractor.extract(user_text, recent_turns)`；`raw_quote` 子串校验。
-- **修改文件**：`config/prompts/extract_symptoms.txt`、`symptoms/extractor.py`、`eval/extraction_cases.yaml`、`eval/run_extraction_eval.py`。
-- **实现类/函数**：`SymptomExtractor`、`verify_quote(item, text) -> bool`。
-- **验收标准**：L2 评测集准确率 ≥ 90%，危险信号召回 100%。
-- **测试方法**：`uv run python eval/run_extraction_eval.py`（需 key，输出逐条对错与汇总）。
+### B2: Persona prompt and context building
+- **Owner**: A
+- **Goal**: write `companion.txt` (warm, short sentences, one question at a time, follows the elder's language, no diagnosis or medication advice, suggests contacting family / 911 for dangerous situations); `build_context()` combines profile + current time + unresolved symptoms from the last 48h + last 10 turns.
+- **Files**: `config/prompts/companion.txt`, `config/prompts/greet.txt`, `chat/context.py`, `tests/unit/test_context.py`.
+- **Classes/functions**: `build_context(elder, history, recent_symptoms, now) -> list[dict]`.
+- **Acceptance**: unit tests assert the context contains the profile and symptom follow-up info, and that turn truncation is correct.
+- **How to test**: `uv run pytest -q tests/unit/test_context.py`.
 
-### D3：合并与告警规则
-- **负责人**：A
-- **目标**：实现 3.4.3 的合并、告警等级、2h 去抖；纯函数优先，DB 操作集中在 service。
-- **修改文件**：`symptoms/merge.py`、`symptoms/rules.py`、`alerts/service.py`、`tests/unit/test_symptom_merge.py`、`tests/unit/test_alert_rules.py`。
-- **实现类/函数**：`merge_symptom(existing, item, now) -> MergeResult`、`alert_level(canonical, severity) -> Level | None`、`should_alert(last_alert_at, now)`。
-- **验收标准**：表驱动用例覆盖：新增、24h 内合并、超窗新增、severity 取最大、`other` 按 label 合并、危险信号 high、severe 普通症状 medium、去抖生效。
-- **测试方法**：`uv run pytest -q tests/unit/test_symptom_merge.py tests/unit/test_alert_rules.py`。
-
-### D4：挂接对话链路与告警广播
-- **负责人**：A
-- **目标**：`/api/chat` 完成后 `BackgroundTasks` 执行抽取 → 合并 → 告警；`alerts.bus` 进程内广播（`asyncio.Queue` 订阅者列表），`GET /api/alerts/stream` SSE 输出。
-- **修改文件**：`chat/service.py`、`web/routes/chat.py`、`alerts/bus.py`、`web/routes/alerts.py`、`tests/integration/test_symptom_pipeline.py`。
-- **实现类/函数**：`process_message_symptoms(message_id)`、`AlertBus.publish()`、`AlertBus.subscribe()`。
-- **验收标准**：**M1**——语音说「这两天早上起来头有点晕」→ `symptom_log` 出现 `dizziness`；说「胸口闷，喘不上气」→ SSE 客户端（`curl -N`）收到 high 告警；对话接口延迟不受影响。
-- **测试方法**：`uv run pytest -q tests/integration/test_symptom_pipeline.py`（mock）；手动真实链路。
+### B3: Text chat endpoint
+- **Owner**: A
+- **Goal**: `POST /api/chat` (JSON `{text}`) and `POST /api/chat/greet`; messages persisted; LLM failure returns a fixed reassuring reply.
+- **Files**: `chat/service.py`, `web/routes/chat.py`, `tests/integration/test_chat_api.py`.
+- **Classes/functions**: `ChatService.reply(elder_id, text) -> ChatResult`, `ChatService.greet(elder_id)`.
+- **Acceptance**: curl with text gets a reply in the matching language (Chinese/English); the message table has two rows.
+- **How to test**: `uv run pytest -q tests/integration/test_chat_api.py` (mock); manually chat 5 turns against the real API to check the persona.
 
 ---
 
-## 阶段 E：子女端（目标：一屏看清老人状态）
+## Stage C: Voice Pipeline (goal: the elder app can listen and speak)
 
-### E1：子女端数据接口
-- **负责人**：A
-- **目标**：`/api/symptoms?days=7`（按天分组、含 count、status、raw_quote）、`/api/messages`、`/api/alerts`、`/api/alerts/{id}/read`。
-- **修改文件**：`web/routes/family.py`、`web/routes/alerts.py`、`tests/integration/test_family_api.py`。
-- **验收标准**：种子数据下返回结构符合前端需要（字段在测试中断言）。
-- **测试方法**：`uv run pytest -q tests/integration/test_family_api.py`。
+### C1: Speech transcription
+- **Owner**: A
+- **Goal**: `/api/chat` accepts multipart `audio` (webm / mp4 / wav), transcribes it, then follows the B3 flow; empty or too-short transcriptions return `{"need_retry": true}`.
+- **Files**: `web/routes/chat.py`, `chat/service.py`, `tests/integration/test_chat_audio.py`.
+- **Classes/functions**: `ChatService.reply_audio(elder_id, upload) -> ChatResult`.
+- **Acceptance**: uploading `tests/fixtures/hello.webm` returns the correct `user_text` (real API); the flow passes under mock.
+- **How to test**: `uv run pytest -q tests/integration/test_chat_audio.py`.
 
-### E2：今日摘要
-- **负责人**：A
-- **目标**：`daily_summary.txt`（2–3 句：精神状态、提到的不适、建议关注，不诊断）；10 分钟缓存；无对话时返回「今天还没有聊天」。
-- **修改文件**：`summary.py`、`config/prompts/daily_summary.txt`、`web/routes/family.py`。
-- **实现类/函数**：`DailySummary.get(elder_id, date)`。
-- **验收标准**：聊 5 轮后摘要能准确提到症状，且不含诊断用语。
-- **测试方法**：手动；mock 单测覆盖缓存逻辑。
+### C2: TTS
+- **Owner**: A
+- **Goal**: `GET /api/tts/{message_id}` generates and caches an mp3 (`data/audio/{id}.mp3`) using `tts_instructions` (slow, warm); on failure return 204 and the frontend shows text only.
+- **Files**: `web/routes/chat.py`, `chat/service.py`.
+- **Classes/functions**: `ChatService.synthesize(message_id) -> Path`.
+- **Acceptance**: opening the URL directly in a browser plays audio; a second request hits the cache.
+- **How to test**: manual; `tests/integration/test_tts.py` (mock returns a silent mp3).
 
-### E3：种子历史数据
-- **负责人**：A
-- **目标**：`seed.py --with-history` 生成过去 6 天的对话与症状（膝盖疼反复出现、失眠好转等），让时间线演示饱满。
-- **修改文件**：`seed.py`。
-- **验收标准**：子女端时间线展示 7 天数据且故事连贯。
-- **测试方法**：`uv run python -m elder_companion.seed --reset --with-history`。
-
-### E4：子女端页面
-- **负责人**：A（功能）/ B（样式）
-- **目标**：`/family` 页面——顶部今日摘要卡；左侧症状时间线（按天、严重度色块、次数、点开看原话）；右侧告警列表（跌倒带截图缩略图）；跌倒检测面板 `<img src=":8001/stream">`；`EventSource` 收到告警时顶部红色横幅 + 提示音；对话记录折叠区。
-- **修改文件**：`web/templates/family.html`、`web/static/family.js`、`web/static/style.css`。
-- **实现类/函数**：`loadSummary()`、`loadSymptoms()`、`loadAlerts()`、`connectAlertStream()`、`showAlertBanner(alert)`。
-- **验收标准**：老人端说出危险症状 → 子女端 ≤ 10s 内弹横幅（抽取耗时在内）；页面在 1280px 与 390px 宽度下均可用。
-- **测试方法**：手动（双窗口并排演练）。
-
-### E5（可选）：子女端「问问 AI」
-- **负责人**：A（依赖 F7）
-- **目标**：`POST /api/family/ask`——启动时通过 MCP client（Streamable HTTP）连 fall-mcp 并 `list_tools()`，转换为 OpenAI function tools；与本地工具 `get_symptoms(days)`、`get_today_summary()` 合并；最多 4 轮 tool call 循环后给出回答；fall-mcp 不可用时自动去掉跌倒工具并在回答中说明。子女端加一个输入框。
-- **修改文件**：`src/elder_companion/family_agent.py`、`web/routes/family.py`、`web/templates/family.html`、`web/static/family.js`、`tests/integration/test_family_agent.py`。
-- **实现类/函数**：`FamilyAgent.ask(question) -> AskResult`、`mcp_tools_to_openai(tools)`、`LocalTools`。
-- **验收标准**：问「妈妈今天有没有摔倒？最近哪里不舒服？」→ 回答同时引用跌倒事件时间与症状日志；`tool_calls` 中可见 `get_fall_events` 与 `get_symptoms`。
-- **测试方法**：`uv run pytest -q tests/integration/test_family_agent.py`（mock LLM 固定 tool_calls + 进程内 fall-mcp）；手动真实链路。
+### C3: Elder app page
+- **Owner**: A (B polishes styling in G1)
+- **Goal**: `/elder` page — a big round button (hold-to-talk / tap-to-toggle modes), status indicator (listening / thinking / speaking), the last 3 chat bubbles, font size ≥ 24px, high contrast; tapping "Start chatting" on entry triggers greet and unlocks audio playback; a hidden text input as fallback.
+- **Files**: `web/templates/elder.html`, `web/static/elder.js`, `web/static/style.css`, `web/routes/pages.py`.
+- **Classes/functions**: `startRecording()`, `stopAndSend()`, `playReply(messageId)`, `setStatus(state)`.
+- **Acceptance**: one full voice round-trip on Chrome + Safari (laptop) via `localhost`; end-to-end < 5s.
+- **How to test**: manual; record latency over 5 rounds.
 
 ---
 
-## 阶段 F：跌倒检测 fall-mcp（目标：M2 —— 播放视频，子女端弹跌倒告警；M3 —— 工具以 MCP 对外）
+## Stage D: Symptom Log (goal: M1 — say one sentence, the symptom appears on the dashboard)
 
-### F1：环境与 Pose 跑通
-- **负责人**：B
-- **目标**：安装 `vision` 依赖组；`pose.py` 封装 `YOLO("yolo11n-pose.pt").track(frame, persist=True)`，输出 `list[PersonPose(track_id, bbox, keypoints[17,3])]`；可视化脚本画骨架。
-- **修改文件**：`src/fall_detector/pose.py`、`src/fall_detector/__main__.py`。
-- **验收标准**：`python -m fall_detector --source demo/videos/walk.mp4 --show` 窗口显示骨架与 track_id，FPS ≥ 12。
-- **测试方法**：手动；终端打印 FPS。
+### D1: Symptom enum and schema
+- **Owner**: A
+- **Goal**: `config/symptoms.yaml` (canonical names, English/Chinese display names, alert levels); Pydantic `SymptomItem` / `SymptomExtraction`, exporting a JSON Schema for Structured Outputs, with the `canonical` enum generated from the yaml.
+- **Files**: `config/symptoms.yaml`, `symptoms/schema.py`, `tests/unit/test_symptom_schema.py`.
+- **Acceptance**: canonical values outside the enum fail validation; the exported schema meets strict-mode requirements (all fields required, `additionalProperties: false`).
+- **How to test**: `uv run pytest -q tests/unit/test_symptom_schema.py`.
 
-### F2：演示视频素材
-- **负责人**：B
-- **目标**：录制/收集 ≥ 3 段视频：正常走动、缓慢躺到沙发（不应报）、跌倒（应报）；固定机位（模拟客厅摄像头高度）。可用 Le2i / UR Fall 公开数据集片段补充（注意许可）。
-- **修改文件**：`demo/videos/*.mp4`、`demo/videos/README.md`（来源与预期结果）。
-- **验收标准**：每段视频标注预期结果。
-- **测试方法**：人工检查。
+### D2: Extractor
+- **Owner**: A
+- **Goal**: `extract_symptoms.txt` (enum list, don't record negations/other people, `raw_quote` must be verbatim, return empty when there are no symptoms, 5 few-shot examples); `SymptomExtractor.extract(user_text, recent_turns)`; `raw_quote` substring check.
+- **Files**: `config/prompts/extract_symptoms.txt`, `symptoms/extractor.py`, `eval/extraction_cases.yaml`, `eval/run_extraction_eval.py`.
+- **Classes/functions**: `SymptomExtractor`, `verify_quote(item, text) -> bool`.
+- **Acceptance**: L2 eval accuracy ≥ 90%, red-flag recall 100%.
+- **How to test**: `uv run python eval/run_extraction_eval.py` (needs a key; prints per-case results and a summary).
 
-### F3：特征计算
-- **负责人**：B
-- **目标**：由关键点计算：bbox 宽高比、躯干角（肩中点–髋中点与竖直方向夹角）、髋中点高度（归一化到身高）、下落速度；低置信度关键点处理。
-- **修改文件**：`src/fall_detector/rules.py`、`tests/unit/test_fall_features.py`。
-- **实现类/函数**：`compute_features(pose, ts) -> Features`。
-- **验收标准**：合成的「直立」「水平」关键点得到预期角度与宽高比。
-- **测试方法**：`uv run pytest -q tests/unit/test_fall_features.py`。
+### D3: Merge and alert rules
+- **Owner**: A
+- **Goal**: implement the merging, alert levels, and 2h debounce from 3.4.3; prefer pure functions and keep DB operations in the service.
+- **Files**: `symptoms/merge.py`, `symptoms/rules.py`, `alerts/service.py`, `tests/unit/test_symptom_merge.py`, `tests/unit/test_alert_rules.py`.
+- **Classes/functions**: `merge_symptom(existing, item, now) -> MergeResult`, `alert_level(canonical, severity) -> Level | None`, `should_alert(last_alert_at, now)`.
+- **Acceptance**: table-driven cases cover: new insert, merge within 24h, new row outside the window, severity takes the max, `other` merges by label, red flags → high, severe ordinary symptoms → medium, debounce works.
+- **How to test**: `uv run pytest -q tests/unit/test_symptom_merge.py tests/unit/test_alert_rules.py`.
 
-### F4：跌倒状态机
-- **负责人**：B
-- **目标**：实现 3.5 状态机（参数来自 settings），每个 track 独立实例，冷却期不重复报。
-- **修改文件**：`src/fall_detector/rules.py`、`tests/unit/test_fall_state_machine.py`、`tests/fixtures/pose_sequences/*.json`。
-- **实现类/函数**：`FallStateMachine.update(features) -> FallEvent | None`。
-- **验收标准**：合成序列：快速倒地并保持 3s → 报 1 次；缓慢躺下 → 不报；倒地 1s 后起身 → 不报；持续倒地 60s → 冷却期内只报 1 次。三段演示视频结果与标注一致。
-- **测试方法**：`uv run pytest -q tests/unit/test_fall_state_machine.py`；`python -m fall_detector --source demo/videos/fall_01.mp4 --dry-run`。
-
-### F5：事件存储、截图与上报
-- **负责人**：B
-- **目标**：`EventStore` 追加写 `data/fall_events.jsonl`（`event_id, ts, track_id, confidence, source[live|offline], verified, snapshot_id`）并维护内存索引；事件触发时保存带骨架标注的截图；`live` 事件调用 `POST /api/alerts`（`ref_id=event_id`），主服务不可达时本地日志 + 重试 3 次，不阻塞检测线程。
-- **修改文件**：`src/fall_detector/events.py`、`src/fall_detector/reporter.py`、`tests/unit/test_event_store.py`、`tests/unit/test_reporter.py`。
-- **实现类/函数**：`EventStore.add(event, frame) -> FallEventRecord`、`EventStore.query(since, limit)`、`EventStore.snapshot_path(event_id)`、`Reporter.report(record)`。
-- **验收标准**：重启进程后历史事件可查询；主服务运行时播放跌倒视频 → `alert` 表出现 fall 记录，子女端 SSE 收到。
-- **测试方法**：`uv run pytest -q tests/unit/test_event_store.py tests/unit/test_reporter.py`（`httpx.MockTransport`）；联调。
-
-### F6：MonitorController 与服务组装（MJPEG）
-- **负责人**：B
-- **目标**：`MonitorController` 管理检测后台线程（`start(source, loop)` / `stop()` / `status()` / `latest_frame()`，线程安全，切源时先停后启）；`server.py` 组装 Starlette：`/stream`（带骨架与 STANDING / FALLING / DOWN 状态文字的 MJPEG，视频播完自动循环）、`/healthz`；启动时按 `autostart_source` 自动开始监控。
-- **修改文件**：`src/fall_detector/monitor.py`、`src/fall_detector/stream.py`、`src/fall_detector/server.py`、`tests/unit/test_monitor.py`。
-- **实现类/函数**：`MonitorController`、`MonitorStatus`、`mjpeg_generator(controller)`、`create_app(settings) -> Starlette`。
-- **验收标准**：**M2**——`uv run python -m fall_detector.server` 启动后子女端面板实时显示检测画面；跌倒视频播放时子女端弹出跌倒告警 + 截图。
-- **测试方法**：`uv run pytest -q tests/unit/test_monitor.py`（用 fake pose 源）；手动联调。
-
-### F7：fall-mcp 工具
-- **负责人**：B
-- **目标**：用 FastMCP 实现 3.6 的 6 个工具 + `fall://live/snapshot` resource，挂载到 `server.py` 的 `/mcp`（Streamable HTTP）；`--stdio` 模式只起 MCP（不起 MJPEG）；参数用类型注解生成 schema，错误映射为 `isError=true` 的可读信息；`get_event_snapshot` 返回 `ImageContent`。
-- **修改文件**：`src/fall_detector/mcp_tools.py`、`src/fall_detector/server.py`、`tests/integration/test_fall_mcp.py`。
-- **实现类/函数**：`build_mcp(controller, store) -> FastMCP`；工具函数 `get_fall_events`、`get_event_snapshot`、`get_monitor_status`、`start_monitoring`、`stop_monitoring`、`analyze_video`。
-- **验收标准**：MCP Inspector（`npx @modelcontextprotocol/inspector`）连 `http://127.0.0.1:8001/mcp` 可列出并调用全部工具；`analyze_video(demo/videos/fall_01.mp4)` 返回 ≥ 1 个事件，`analyze_video(demo/videos/lie_down.mp4)` 返回 0 个；不存在的路径返回工具错误而非崩溃。
-- **测试方法**：`uv run pytest -q tests/integration/test_fall_mcp.py`（MCP SDK 进程内 client + fake pose 源）；Inspector 手动验证。
-
-### F8：Claude Desktop 联调
-- **负责人**：B
-- **目标**：写 `docs/mcp_desktop.md`（`claude_desktop_config.json` 的 stdio 配置示例，含 `uv run --directory` 绝对路径）；在 Claude Desktop 中问「今天有没有检测到摔倒？给我看截图」完成调用。
-- **修改文件**：`docs/mcp_desktop.md`。
-- **验收标准**：Claude Desktop 中能列出 fall-mcp 工具，并返回事件与截图。
-- **测试方法**：手动；录屏作为演示加分素材。
-
-### F9（可选）：视觉模型二次确认
-- **负责人**：B
-- **目标**：`vision_verify: true` 时，事件截图交给 GPT 视觉模型（`fall_verify.txt`：「图中是否有人摔倒在地？只回答 JSON」），结果写入事件 `verified` 字段；否定则告警降级为 medium 或不推送。
-- **修改文件**：`src/fall_detector/reporter.py`、`config/prompts/fall_verify.txt`。
-- **验收标准**：跌倒截图确认通过；躺沙发截图被否决。
-- **测试方法**：手动对 3 张截图验证。
+### D4: Wire into the chat flow and broadcast alerts
+- **Owner**: A
+- **Goal**: after `/api/chat` completes, `BackgroundTasks` runs extract → merge → alert; `alerts.bus` broadcasts in-process (a list of `asyncio.Queue` subscribers); `GET /api/alerts/stream` emits SSE.
+- **Files**: `chat/service.py`, `web/routes/chat.py`, `alerts/bus.py`, `web/routes/alerts.py`, `tests/integration/test_symptom_pipeline.py`.
+- **Classes/functions**: `process_message_symptoms(message_id)`, `AlertBus.publish()`, `AlertBus.subscribe()`.
+- **Acceptance**: **M1** — saying "这两天早上起来头有点晕" ("I've been a bit dizzy in the mornings these past two days") → `dizziness` appears in `symptom_log`; saying "胸口闷，喘不上气" ("my chest feels tight, I can't catch my breath") → an SSE client (`curl -N`) receives a high alert; chat latency is unaffected.
+- **How to test**: `uv run pytest -q tests/integration/test_symptom_pipeline.py` (mock); manual end-to-end with the real API.
 
 ---
 
-## 阶段 G：收尾（目标：演示稳定、可讲述）
+## Stage E: Family Dashboard (goal: see the elder's status on one screen)
 
-### G1：UI 打磨与适配
-- **负责人**：B（A 配合）
-- **目标**：老人端：大字、高对比、按钮动效、状态插画；子女端：卡片布局、严重度配色、告警横幅；免责声明（「本产品不提供医疗诊断」）。
-- **修改文件**：`web/static/style.css`、两个模板。
-- **验收标准**：iPad / 手机尺寸（390px）下无横向滚动；老人端一眼能看出「按这里说话」。
-- **测试方法**：浏览器设备模拟 + 真机。
+### E1: Dashboard data endpoints
+- **Owner**: A
+- **Goal**: `/api/symptoms?days=7` (grouped by day, with count, status, raw_quote), `/api/messages`, `/api/alerts`, `/api/alerts/{id}/read`.
+- **Files**: `web/routes/family.py`, `web/routes/alerts.py`, `tests/integration/test_family_api.py`.
+- **Acceptance**: with seed data, responses have the shape the frontend needs (fields asserted in tests).
+- **How to test**: `uv run pytest -q tests/integration/test_family_api.py`.
 
-### G2：演示脚本与素材
-- **负责人**：B（A 审核）
-- **目标**：写 `demo/SCRIPT.md`（下方草案细化到每句台词、预期画面、兜底方案），准备备用录屏视频（网络全挂时播放）。
-- **修改文件**：`demo/SCRIPT.md`、`demo/backup_recording.mp4`。
-- **验收标准**：完整演示 ≤ 5 分钟，每一步都有兜底。
-- **测试方法**：彩排。
+### E2: Today's summary
+- **Owner**: A
+- **Goal**: `daily_summary.txt` (2–3 sentences: mood, discomforts mentioned, things to watch; no diagnosis); 10-minute cache; returns "No conversations yet today" when there is no chat.
+- **Files**: `summary.py`, `config/prompts/daily_summary.txt`, `web/routes/family.py`.
+- **Classes/functions**: `DailySummary.get(elder_id, date)`.
+- **Acceptance**: after 5 turns of chat the summary accurately mentions the symptoms and contains no diagnostic language.
+- **How to test**: manual; mock unit tests cover the caching logic.
 
-### G3：一键启动与 README
-- **负责人**：A
-- **目标**：`scripts/dev_up.ps1`：初始化 DB + 种子 → 启动 web → 启动 fall_detector；README 写清环境、`.env`、启动、演示账号/URL。
-- **修改文件**：`scripts/dev_up.ps1`、`README.md`。
-- **验收标准**：新克隆的仓库按 README 10 分钟内跑起来。
-- **测试方法**：在队友电脑上从零执行一遍。
+### E3: Seed history data
+- **Owner**: A
+- **Goal**: `seed.py --with-history` generates conversations and symptoms for the past 6 days (recurring knee pain, improving insomnia, etc.) so the timeline looks full in the demo.
+- **Files**: `seed.py`.
+- **Acceptance**: the dashboard timeline shows 7 days of data with a coherent story.
+- **How to test**: `uv run python -m elder_companion.seed --reset --with-history`.
 
-### G4：全链路验收与彩排
-- **负责人**：A + B
-- **目标**：跑完 L1 + L2；按演示脚本彩排 ≥ 3 遍，记录 2.5 指标；准备 mock 兜底（`LLM_PROVIDER=mock` 下演示剧本可完整回放）。
-- **修改文件**：`DEV_SPEC.md`（进度与指标收口）。
-- **验收标准**：`uv run pytest -q` 全绿；2.5 表填写；进度表全部 ✅。
-- **测试方法**：`uv run pytest -q && uv run python eval/run_extraction_eval.py`。
+### E4: Dashboard page
+- **Owner**: A (features) / B (styling)
+- **Goal**: `/family` page — today's summary card at the top; symptom timeline on the left (by day, severity color chips, counts, click to see the original quote); alert list on the right (falls with snapshot thumbnails); fall-detection panel `<img src=":8001/stream">`; a red banner + sound at the top when `EventSource` receives an alert; collapsible conversation history.
+- **Files**: `web/templates/family.html`, `web/static/family.js`, `web/static/style.css`.
+- **Classes/functions**: `loadSummary()`, `loadSymptoms()`, `loadAlerts()`, `connectAlertStream()`, `showAlertBanner(alert)`.
+- **Acceptance**: elder mentions a red-flag symptom → the dashboard shows the banner within ≤ 10s (including extraction time); the page works at both 1280px and 390px widths.
+- **How to test**: manual (two windows side by side).
 
-### 演示脚本（草案）
+### E5 (optional): "Ask AI" on the dashboard
+- **Owner**: A (depends on F7)
+- **Goal**: `POST /api/family/ask` — on startup, connect to fall-mcp via the MCP client (Streamable HTTP), `list_tools()`, and convert them to OpenAI function tools; merge with local tools `get_symptoms(days)` and `get_today_summary()`; answer after at most 4 rounds of tool calls; if fall-mcp is unavailable, drop the fall tools automatically and say so in the answer. Add an input box to the dashboard.
+- **Files**: `src/elder_companion/family_agent.py`, `web/routes/family.py`, `web/templates/family.html`, `web/static/family.js`, `tests/integration/test_family_agent.py`.
+- **Classes/functions**: `FamilyAgent.ask(question) -> AskResult`, `mcp_tools_to_openai(tools)`, `LocalTools`.
+- **Acceptance**: asking "Did Mom fall today? Has anything been bothering her lately?" → the answer cites both the fall event time and the symptom log; `tool_calls` shows `get_fall_events` and `get_symptoms`.
+- **How to test**: `uv run pytest -q tests/integration/test_family_agent.py` (mock LLM with fixed tool_calls + in-process fall-mcp); manual end-to-end.
 
-| # | 操作 | 预期 |
+---
+
+## Stage F: Fall Detection fall-mcp (goal: M2 — play a video, the dashboard shows a fall alert; M3 — tools exposed over MCP)
+
+### F1: Environment setup and pose running
+- **Owner**: B
+- **Goal**: install the `vision` extra; `pose.py` wraps `YOLO("yolo11n-pose.pt").track(frame, persist=True)` and outputs `list[PersonPose(track_id, bbox, keypoints[17,3])]`; a visualization script draws skeletons.
+- **Files**: `src/fall_detector/pose.py`, `src/fall_detector/__main__.py`.
+- **Acceptance**: `python -m fall_detector --source demo/videos/walk.mp4 --show` displays skeletons and track_ids in a window at FPS ≥ 12.
+- **How to test**: manual; FPS printed to the terminal.
+
+### F2: Demo video footage
+- **Owner**: B
+- **Goal**: record/collect ≥ 3 clips: normal walking, slowly lying down on a sofa (should not alert), a fall (should alert); fixed camera position (simulating a living-room camera height). Clips from the Le2i / UR Fall public datasets may supplement these (mind the licenses).
+- **Files**: `demo/videos/*.mp4`, `demo/videos/README.md` (sources and expected results).
+- **Acceptance**: every clip is labeled with its expected result.
+- **How to test**: manual review.
+
+### F3: Feature computation
+- **Owner**: B
+- **Goal**: compute from keypoints: bbox aspect ratio, torso angle (shoulder midpoint–hip midpoint vs. vertical), hip-midpoint height (normalized to body height), fall speed; handle low-confidence keypoints.
+- **Files**: `src/fall_detector/rules.py`, `tests/unit/test_fall_features.py`.
+- **Classes/functions**: `compute_features(pose, ts) -> Features`.
+- **Acceptance**: synthetic "upright" and "horizontal" keypoints produce the expected angles and aspect ratios.
+- **How to test**: `uv run pytest -q tests/unit/test_fall_features.py`.
+
+### F4: Fall state machine
+- **Owner**: B
+- **Goal**: implement the state machine from 3.5 (parameters from settings), one instance per track, no repeat alerts during cooldown.
+- **Files**: `src/fall_detector/rules.py`, `tests/unit/test_fall_state_machine.py`, `tests/fixtures/pose_sequences/*.json`.
+- **Classes/functions**: `FallStateMachine.update(features) -> FallEvent | None`.
+- **Acceptance**: synthetic sequences: fast fall then staying down 3s → exactly 1 alert; slowly lying down → none; down for 1s then getting up → none; staying down for 60s → only 1 alert within the cooldown. Results on the three demo videos match their labels.
+- **How to test**: `uv run pytest -q tests/unit/test_fall_state_machine.py`; `python -m fall_detector --source demo/videos/fall_01.mp4 --dry-run`.
+
+### F5: Event store, snapshots, and reporting
+- **Owner**: B
+- **Goal**: `EventStore` appends to `data/fall_events.jsonl` (`event_id, ts, track_id, confidence, source[live|offline], verified, snapshot_id`) and maintains an in-memory index; on an event, save a snapshot with the skeleton overlay; `live` events call `POST /api/alerts` (`ref_id=event_id`); if the main service is unreachable, log locally and retry 3 times without blocking the detection thread.
+- **Files**: `src/fall_detector/events.py`, `src/fall_detector/reporter.py`, `tests/unit/test_event_store.py`, `tests/unit/test_reporter.py`.
+- **Classes/functions**: `EventStore.add(event, frame) -> FallEventRecord`, `EventStore.query(since, limit)`, `EventStore.snapshot_path(event_id)`, `Reporter.report(record)`.
+- **Acceptance**: past events are still queryable after a process restart; with the main service running, playing the fall video → a fall row appears in the `alert` table and the dashboard receives it over SSE.
+- **How to test**: `uv run pytest -q tests/unit/test_event_store.py tests/unit/test_reporter.py` (`httpx.MockTransport`); integration run.
+
+### F6: MonitorController and service assembly (MJPEG)
+- **Owner**: B
+- **Goal**: `MonitorController` manages the background detection thread (`start(source, loop)` / `stop()` / `status()` / `latest_frame()`, thread-safe, stop-then-start when switching sources); `server.py` assembles the Starlette app: `/stream` (MJPEG with skeletons and STANDING / FALLING / DOWN status text; video files loop when finished) and `/healthz`; monitoring starts automatically from `autostart_source` on launch.
+- **Files**: `src/fall_detector/monitor.py`, `src/fall_detector/stream.py`, `src/fall_detector/server.py`, `tests/unit/test_monitor.py`.
+- **Classes/functions**: `MonitorController`, `MonitorStatus`, `mjpeg_generator(controller)`, `create_app(settings) -> Starlette`.
+- **Acceptance**: **M2** — after `uv run python -m fall_detector.server` starts, the dashboard panel shows the live detection view; when the fall video plays, the dashboard pops up a fall alert + snapshot.
+- **How to test**: `uv run pytest -q tests/unit/test_monitor.py` (with a fake pose source); manual integration.
+
+### F7: fall-mcp tools
+- **Owner**: B
+- **Goal**: implement the 6 tools from 3.6 + the `fall://live/snapshot` resource with FastMCP, mounted at `/mcp` in `server.py` (Streamable HTTP); `--stdio` mode runs MCP only (no MJPEG); parameter schemas generated from type annotations; errors mapped to readable `isError=true` results; `get_event_snapshot` returns `ImageContent`.
+- **Files**: `src/fall_detector/mcp_tools.py`, `src/fall_detector/server.py`, `tests/integration/test_fall_mcp.py`.
+- **Classes/functions**: `build_mcp(controller, store) -> FastMCP`; tool functions `get_fall_events`, `get_event_snapshot`, `get_monitor_status`, `start_monitoring`, `stop_monitoring`, `analyze_video`.
+- **Acceptance**: MCP Inspector (`npx @modelcontextprotocol/inspector`) connected to `http://127.0.0.1:8001/mcp` can list and call every tool; `analyze_video(demo/videos/fall_01.mp4)` returns ≥ 1 event and `analyze_video(demo/videos/lie_down.mp4)` returns 0; a nonexistent path returns a tool error instead of crashing.
+- **How to test**: `uv run pytest -q tests/integration/test_fall_mcp.py` (MCP SDK in-process client + fake pose source); manual verification in the Inspector.
+
+### F8: Claude Desktop integration
+- **Owner**: B
+- **Goal**: write `docs/mcp_desktop.md` (a stdio config example for `claude_desktop_config.json`, including the absolute path for `uv run --directory`); in Claude Desktop, ask "Were any falls detected today? Show me the snapshot" and complete the tool calls.
+- **Files**: `docs/mcp_desktop.md`.
+- **Acceptance**: Claude Desktop lists the fall-mcp tools and returns events and snapshots.
+- **How to test**: manual; record the screen as bonus demo material.
+
+### F9 (optional): Second check with a vision model
+- **Owner**: B
+- **Goal**: when `vision_verify: true`, send the event snapshot to a GPT vision model (`fall_verify.txt`: "Is there a person who has fallen on the ground in this image? Reply with JSON only"); write the result to the event's `verified` field; if rejected, downgrade the alert to medium or don't push it.
+- **Files**: `src/fall_detector/reporter.py`, `config/prompts/fall_verify.txt`.
+- **Acceptance**: fall snapshots are confirmed; the lying-on-sofa snapshot is rejected.
+- **How to test**: manually verify against 3 snapshots.
+
+---
+
+## Stage G: Wrap-up (goal: a stable, well-told demo)
+
+### G1: UI polish and responsiveness
+- **Owner**: B (with A's help)
+- **Goal**: elder app: large text, high contrast, button animations, status illustrations; dashboard: card layout, severity colors, alert banner; a disclaimer ("This product does not provide medical diagnosis").
+- **Files**: `web/static/style.css`, both templates.
+- **Acceptance**: no horizontal scrolling at iPad / phone sizes (390px); in the elder app it's obvious at a glance where to "press here to talk".
+- **How to test**: browser device emulation + real devices.
+
+### G2: Demo script and materials
+- **Owner**: B (reviewed by A)
+- **Goal**: write `demo/SCRIPT.md` (expanding the draft below down to every line, expected screen, and fallback), and prepare a backup screen recording (to play if the network completely fails).
+- **Files**: `demo/SCRIPT.md`, `demo/backup_recording.mp4`.
+- **Acceptance**: the full demo is ≤ 5 minutes and every step has a fallback.
+- **How to test**: rehearsal.
+
+### G3: One-command startup and README
+- **Owner**: A
+- **Goal**: `scripts/dev_up.ps1`: init DB + seed → start web → start fall_detector; the README clearly covers environment, `.env`, startup, and demo URLs.
+- **Files**: `scripts/dev_up.ps1`, `README.md`.
+- **Acceptance**: a fresh clone runs within 10 minutes by following the README.
+- **How to test**: run it from scratch on the teammate's machine.
+
+### G4: End-to-end acceptance and rehearsal
+- **Owner**: A + B
+- **Goal**: run all of L1 + L2; rehearse the demo script ≥ 3 times and record the 2.5 metrics; prepare the mock fallback (the full demo script replays under `LLM_PROVIDER=mock`).
+- **Files**: `DEV_SPEC.md` (final progress and metrics).
+- **Acceptance**: `uv run pytest -q` is all green; the 2.5 table is filled in; every task in the progress table is ✅.
+- **How to test**: `uv run pytest -q && uv run python eval/run_extraction_eval.py`.
+
+### Demo Script (draft)
+
+| # | Action | Expected |
 |---|---|---|
-| 1 | 打开老人端，点「开始聊天」 | AI 按时段问候，并回访昨天的膝盖疼（种子数据） |
-| 2 | 老人：“Much better today, but I didn't sleep well last night.” | AI 关心睡眠；子女端新增 `insomnia` |
-| 3 | 老人：“这两天早上起来头有点晕” | AI 追问细节；子女端 `dizziness` 出现在时间线 |
-| 4 | 老人：“My chest feels tight and I can't catch my breath” | AI 安抚并建议联系家人/911；子女端弹出 **high** 告警 |
-| 5 | 切到子女端，播放跌倒视频 | 检测画面显示 FALLING → DOWN；弹出跌倒告警 + 截图 |
-| 6 | 子女端刷新今日摘要 | 摘要覆盖睡眠、头晕、胸闷告警 |
-| 7 | 子女端「问问 AI」：“Did Mom fall today? Anything else I should know?”（E5） | 回答引用跌倒时间 + 症状；展示 tool_calls |
-| 8 | 切到 Claude Desktop 问同样问题（F8） | 通过 fall-mcp 返回事件与截图——展示「能力可复用」 |
+| 1 | Open the elder app and tap "Start chatting" | AI greets by time of day and follows up on yesterday's knee pain (seed data) |
+| 2 | Elder: "Much better today, but I didn't sleep well last night." | AI asks about sleep; `insomnia` is added on the dashboard |
+| 3 | Elder: "这两天早上起来头有点晕" ("I've been a bit dizzy in the mornings these past two days") | AI asks for details; `dizziness` appears on the dashboard timeline |
+| 4 | Elder: "My chest feels tight and I can't catch my breath" | AI reassures and suggests contacting family / 911; a **high** alert pops up on the dashboard |
+| 5 | Switch to the dashboard and play the fall video | Detection view shows FALLING → DOWN; fall alert + snapshot pops up |
+| 6 | Refresh today's summary on the dashboard | Summary covers sleep, dizziness, and the chest-tightness alert |
+| 7 | Dashboard "Ask AI": "Did Mom fall today? Anything else I should know?" (E5) | Answer cites the fall time + symptoms; tool_calls are shown |
+| 8 | Switch to Claude Desktop and ask the same question (F8) | Returns events and snapshots via fall-mcp — showing the capability is reusable |
 
-### 交付里程碑
+### Delivery Milestones
 
-| 里程碑 | 完成阶段 | 时间 | 可演示内容 |
+| Milestone | Stages completed | When | What can be demoed |
 |---|---|---|---|
-| 契约冻结 | A | D1 上午 | `POST /api/alerts` 可用，B 可联调 |
-| M1 | A–D | D1 晚 | 语音对话 + 症状日志 + 危险告警（SSE） |
-| M2 | E、F1–F6 | D2 上午 | 子女端完整 + 跌倒告警 |
-| M3 | F7–F8（+E5） | D2 中午 | fall-mcp：Inspector / Claude Desktop 调用；（可选）子女端问答 Agent |
-| 交付 | G | D2 傍晚 | 打磨后的 UI + 演示脚本 + 兜底方案 |
+| Contract frozen | A | D1 morning | `POST /api/alerts` available; B can integrate |
+| M1 | A–D | D1 evening | Voice chat + symptom log + red-flag alerts (SSE) |
+| M2 | E, F1–F6 | D2 morning | Complete dashboard + fall alerts |
+| M3 | F7–F8 (+E5) | D2 midday | fall-mcp called from Inspector / Claude Desktop; (optional) dashboard Q&A agent |
+| Delivery | G | D2 evening | Polished UI + demo script + fallbacks |
 
 ---
 
-## 7. 可扩展性与未来展望
+## 7. Extensibility & Future Work
 
-- **Realtime 语音**：OpenAI Realtime API（WebRTC）实现 <1s 语音对语音与打断；转写旁路继续喂症状抽取。
-- **更多视觉 MCP 工具**：活动量统计（今天走动了多久）、久坐/长时间未出现提醒、夜间起夜次数——在 fall-mcp 基础上扩展为 home-vision-mcp。
-- **更鲁棒的跌倒识别**：ST-GCN / PoseC3D（NTU RGB+D `falling down`）替换规则；自家场景数据微调；多摄像头。
-- **非视觉传感**：毫米波雷达（卫生间/卧室隐私场景）、智能手表跌倒与心率。
-- **用药提醒与依从性**：定时提醒 + 对话中确认「吃了没」，记录依从率给子女。
-- **认知与情绪趋势**：长期追踪孤独感、情绪低落、重复提问（认知衰退早期信号），周报推送。
-- **长期记忆**：老人的家人、往事、喜好写入记忆库（向量检索），陪伴更有「熟人感」。
-- **通知通道**：短信 / 邮件 / App 推送；紧急情况一键呼叫子女。
-- **多家庭与权限**：账号体系、多子女共同看护、医生只读视图。
-- **合规**：HIPAA 相关数据加密与审计（进入美国市场必需）。
+- **Realtime voice**: OpenAI Realtime API (WebRTC) for <1s speech-to-speech with barge-in; side-channel transcription keeps feeding symptom extraction.
+- **More vision MCP tools**: activity stats (how long she walked around today), alerts for prolonged sitting / not being seen for a long time, number of nighttime bathroom trips — growing fall-mcp into a home-vision-mcp.
+- **More robust fall recognition**: replace rules with ST-GCN / PoseC3D (NTU RGB+D `falling down`); fine-tune on in-home footage; multiple cameras.
+- **Non-visual sensing**: mmWave radar (for private spaces like bathrooms/bedrooms), smartwatch fall detection and heart rate.
+- **Medication reminders and adherence**: scheduled reminders + confirming "did you take it?" in conversation, reporting adherence to the family.
+- **Cognitive and mood trends**: long-term tracking of loneliness, low mood, and repeated questions (an early sign of cognitive decline), with weekly reports.
+- **Long-term memory**: store the elder's family, life stories, and preferences in a memory store (vector retrieval) for a more "familiar" companion.
+- **Notification channels**: SMS / email / app push; one-tap call to family in emergencies.
+- **Multi-family and permissions**: accounts, multiple caregivers per elder, a read-only view for doctors.
+- **Compliance**: HIPAA-related data encryption and auditing (required to enter the US market).
 
 ---
 
-## 8. 附录：设计决策记录（ADR）
+## 8. Appendix: Architecture Decision Records (ADR)
 
-| # | 决策 | 备选 | 理由 |
+| # | Decision | Alternatives | Rationale |
 |---|---|---|---|
-| 1 | 语音采用「录音 → 转写 → Chat → TTS」串行管线 | 浏览器 Web Speech；Realtime API | 质量与开发成本平衡；症状日志天然需要文本；Realtime 留作加分项 |
-| 2 | 全部模型走 OpenAI，模型名配置化 | 多供应商 / 本地模型 | 演示在美国无网络限制；一套 SDK 覆盖 LLM/ASR/TTS/Vision |
-| 3 | 不用 LangGraph / Agent 框架 | LangGraph（rift 同款） | 老人端无多步任务流；2 天工期内框架是负收益 |
-| 4 | 症状抽取异步、不在对话关键路径 | 同步抽取 / 一次调用同时回复+抽取 | 对话延迟优先；抽取失败不影响陪伴 |
-| 5 | LLM 只抽取，归一化/合并/告警由代码 + `symptoms.yaml` 决定 | LLM 直接判断是否告警 | 可测试、可解释；危险信号召回不依赖 LLM 判断 |
-| 6 | Structured Outputs strict + `raw_quote` 原话校验 | 自由 JSON / 正则解析 | 保证格式合法；抑制幻觉症状 |
-| 7 | 跌倒检测 = YOLO11-pose + 时序规则状态机；视觉 LLM 仅做可选复核 | 单帧 fall 检测模型；ST-GCN | 开箱可用、可解释、可调参；下落速度可区分躺下与摔倒 |
-| 8 | 跌倒检测独立进程，做成 **fall-mcp**：查询/控制走 MCP 工具，实时告警仍走 push（`POST /api/alerts`） | 纯 HTTP 服务；纯 MCP（告警也靠客户端轮询） | MCP 是客户端拉取模型，不适合实时告警；查询能力协议化后可被子女端 Agent、Claude Desktop 复用；两人并行、YOLO 依赖隔离 |
-| 13 | fall-mcp 同一 Starlette 进程挂 `/mcp` + `/stream` + `/healthz`；stdio 模式供桌面客户端 | MJPEG 与 MCP 分两个进程 | 共享同一个 MonitorController 与最新帧，避免跨进程同步 |
-| 14 | fall-mcp 是跌倒事件唯一数据源；主服务 alert 表只存告警副本（`ref_id`） | 主服务存全部事件 | 离线分析事件不产生告警，但仍可查询；职责清晰 |
-| 9 | 实时推送用 SSE | WebSocket | 单向推送足够，实现与重连更简单 |
-| 10 | 前端 Jinja2 + 原生 JS，不做构建 | React / Vite | 两个页面、2 天工期；重点在 AI 能力 |
-| 11 | 写死 1 位老人 + 1 位子女，不做登录 | 账号体系 | 控制范围；演示聚焦核心价值 |
-| 12 | 演示以预录视频 + 种子历史数据为主，mock 兜底 | 全部现场实时 | 演示可复现，避免网络/光线导致翻车 |
+| 1 | Voice uses a sequential "record → transcribe → chat → TTS" pipeline | Browser Web Speech; Realtime API | Balances quality and dev cost; the symptom log needs text anyway; Realtime kept as a stretch goal |
+| 2 | All models go through OpenAI, with configurable model names | Multiple providers / local models | Demo is in the US with no network restrictions; one SDK covers LLM/ASR/TTS/Vision |
+| 3 | No LangGraph / agent framework | LangGraph (as in rift) | The elder app has no multi-step task flow; a framework is a net negative in a 2-day build |
+| 4 | Symptom extraction is async and off the chat critical path | Synchronous extraction / one call for both reply and extraction | Chat latency comes first; extraction failures don't affect companionship |
+| 5 | The LLM only extracts; normalization/merging/alerting are decided by code + `symptoms.yaml` | Let the LLM decide whether to alert | Testable and explainable; red-flag recall doesn't depend on LLM judgment |
+| 6 | Strict Structured Outputs + verbatim `raw_quote` check | Free-form JSON / regex parsing | Guarantees valid format; suppresses hallucinated symptoms |
+| 7 | Fall detection = YOLO11-pose + temporal rule state machine; vision LLM only as an optional second check | Single-frame fall detection model; ST-GCN | Works out of the box, explainable, tunable; fall speed distinguishes lying down from falling |
+| 8 | Fall detection is a separate process built as **fall-mcp**: queries/control via MCP tools, real-time alerts still pushed (`POST /api/alerts`) | Plain HTTP service; pure MCP (clients poll for alerts too) | MCP is client-pull and unsuited to real-time alerts; exposing queries as a protocol lets the dashboard agent and Claude Desktop reuse them; enables parallel work and isolates YOLO dependencies |
+| 9 | SSE for real-time push | WebSocket | One-way push is enough; simpler to implement and reconnect |
+| 10 | Frontend is Jinja2 + vanilla JS, no build step | React / Vite | Two pages, a 2-day build; the focus is the AI capabilities |
+| 11 | One hard-coded elder + one family member, no login | Account system | Controls scope; the demo focuses on core value |
+| 12 | Demo relies mainly on pre-recorded video + seeded history, with a mock fallback | Everything live on site | Reproducible demo; avoids failures from network or lighting |
+| 13 | fall-mcp serves `/mcp` + `/stream` + `/healthz` from one Starlette process; stdio mode for desktop clients | MJPEG and MCP in two processes | Shares one MonitorController and latest frame; avoids cross-process sync |
+| 14 | fall-mcp is the single source of truth for fall events; the main service's alert table only stores alert copies (`ref_id`) | Main service stores all events | Offline-analysis events create no alerts but remain queryable; clear separation of responsibilities |
