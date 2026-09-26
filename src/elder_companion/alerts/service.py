@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from sqlalchemy import select
+from datetime import datetime
+
+from sqlalchemy import String, cast, func, select
 from sqlalchemy.orm import Session
 
 from elder_companion.alerts.schemas import AlertIn
 from elder_companion.elders import get_elder
-from elder_companion.models import DEFAULT_ELDER_ID, Alert
+from elder_companion.models import DEFAULT_ELDER_ID, Alert, SymptomLog
 
 
 def create_alert(session: Session, data: AlertIn) -> Alert:
@@ -24,3 +26,18 @@ def list_alerts(session: Session, elder_id: int = DEFAULT_ELDER_ID, limit: int =
         .limit(limit)
     )
     return list(session.scalars(stmt))
+
+
+def last_symptom_alert_at(session: Session, elder_id: int, canonical: str) -> datetime | None:
+    """When the last symptom alert for `canonical` was raised (symptom alerts keep the
+    symptom_log id in ref_id). Used to debounce repeat alerts."""
+    stmt = (
+        select(func.max(Alert.created_at))
+        .join(SymptomLog, Alert.ref_id == cast(SymptomLog.id, String))
+        .where(
+            Alert.elder_id == elder_id,
+            Alert.type == "symptom",
+            SymptomLog.canonical == canonical,
+        )
+    )
+    return session.scalar(stmt)
