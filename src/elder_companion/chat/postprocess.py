@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Iterable
 
 logger = logging.getLogger(__name__)
 
@@ -74,14 +75,24 @@ _EMERGENCY = re.compile(r"911|急救|打120")
 _CJK = re.compile(r"[一-鿿]")
 
 
-def gives_medical_advice(text: str) -> bool:
+_WORD = re.compile(r"[\w一-鿿]+")
+
+
+def gives_medical_advice(text: str, allowed: Iterable[str] = ()) -> bool:
+    """`allowed`: family-written texts (reminders, H5) the companion may repeat; their words
+    (a medicine name, "81 mg") are not held against the reply."""
+    for phrase in allowed:
+        text = re.sub(re.escape(phrase), " ", text, flags=re.IGNORECASE)
+        for word in _WORD.findall(phrase):
+            if len(word) >= 2:
+                text = re.sub(rf"(?<!\w){re.escape(word)}(?!\w)", " ", text, flags=re.I)
     return bool(_MEDICAL_ADVICE.search(text))
 
 
-def guard_medical_advice(text: str) -> str:
+def guard_medical_advice(text: str, allowed: Iterable[str] = ()) -> str:
     """Replace a reply that gives medical advice with a safe one in the same language.
     Emergency replies (call 911) are never replaced."""
-    if _EMERGENCY.search(text) or not gives_medical_advice(text):
+    if _EMERGENCY.search(text) or not gives_medical_advice(text, allowed):
         return text
     logger.info("replacing a reply that gave medical advice: %r", text)
     return _SAFE_REPLY["zh" if _CJK.search(text) else "en"]

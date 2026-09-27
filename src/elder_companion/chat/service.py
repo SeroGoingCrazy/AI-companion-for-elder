@@ -26,7 +26,15 @@ from elder_companion.consent import sharing_choices
 from elder_companion.db import utcnow
 from elder_companion.elders import get_elder
 from elder_companion.llm import BaseLLMClient, LLMError
-from elder_companion.models import ChatSession, Elder, FamilyMember, MemoryItem, Message, SymptomLog
+from elder_companion.models import (
+    ChatSession,
+    Elder,
+    FamilyMember,
+    MemoryItem,
+    Message,
+    Reminder,
+    SymptomLog,
+)
 from elder_companion.settings import AgendaSettings, ChatSettings, MemorySettings
 
 logger = logging.getLogger(__name__)
@@ -104,7 +112,7 @@ class ChatService:
         )
         try:
             reply = tidy_reply(self._llm.chat(messages, max_tokens=self._s.max_reply_tokens))
-            reply = guard_medical_advice(reply)
+            reply = guard_medical_advice(reply, self._reminder_texts(elder))
             fallback = False
         except LLMError:
             logger.warning("chat LLM call failed; using fallback reply", exc_info=True)
@@ -152,17 +160,19 @@ class ChatService:
             sharing=sharing_choices(self._session, elder.id),
         )
         try:
-            reply = tidy_reply(self._llm.chat(messages, max_tokens=self._s.max_reply_tokens))
-            reply = guard_medical_advice(reply)
+            raw = tidy_reply(self._llm.chat(messages, max_tokens=self._s.max_reply_tokens))
+            reply = guard_medical_advice(raw, self._reminder_texts(elder))
             fallback = False
+            # A greeting replaced by the medical-advice guard did not carry the agenda.
+            carried = reply == raw
         except LLMError:
             logger.warning("greet LLM call failed; using fallback greeting", exc_info=True)
             lang = greeting_language(elder, history)
             template = FALLBACK_GREETING.get(lang, FALLBACK_GREETING["en"])
             reply = template.format(part_of_day=part_of_day(now), nickname=elder.nickname)
-            fallback = True
+            fallback, carried = True, False
         assistant_msg = self._save(elder, "assistant", reply, chat.id)
-        if not fallback:
+        if carried:
             self._agenda.mark_carried(agenda, now.date())
             if disclose:
                 elder.privacy_disclosed_at = utcnow()
@@ -224,6 +234,15 @@ class ChatService:
             .limit(MAX_MEMORY_ITEMS)
         )
         return list(reversed(self._session.scalars(stmt).all()))
+
+    def _reminder_texts(self, elder: Elder) -> list[str]:
+        """The family's own reminder wording, which the companion may repeat word for word
+        (a medicine name or dose in it is not medical advice from the companion)."""
+        return list(
+            self._session.scalars(
+                select(Reminder.text).where(Reminder.elder_id == elder.id, Reminder.active)
+            )
+        )
 
     def _family_name(self, elder: Elder) -> str:
         name = self._session.scalar(

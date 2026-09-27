@@ -70,3 +70,12 @@ def test_medical_advice_is_replaced(reply: str) -> None:
 )
 def test_ordinary_replies_pass(reply: str) -> None:
     assert guard_medical_advice(reply) == reply
+
+
+def test_family_reminder_wording_is_not_advice() -> None:
+    reply = "Good morning, Maggie! Amy asked me to check on your aspirin 81 mg. Have you had it?"
+    assert guard_medical_advice(reply) != reply
+    assert guard_medical_advice(reply, ["aspirin 81 mg with breakfast"]) == reply
+    # only her reminder's words are exempt, not new advice next to them
+    advice = "Amy asked about your aspirin. Also try some ibuprofen for the knee."
+    assert guard_medical_advice(advice, ["aspirin 81 mg with breakfast"]) != advice
