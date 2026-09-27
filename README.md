@@ -18,7 +18,8 @@ Both surfaces install to a phone home screen, in English or Simplified Chinese.
 
 > This product does not provide medical diagnosis.
 
-See [DEV_SPEC.md](DEV_SPEC.md) for the full design and development plan.
+A walk through every feature with screenshots: [docs/FEATURES.md](docs/FEATURES.md).
+The full design and development plan: [DEV_SPEC.md](DEV_SPEC.md).
 
 ## Try it in two minutes
 
