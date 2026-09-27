@@ -19,7 +19,7 @@ from elder_companion.seed import seed_demo
 from elder_companion.settings import Settings, get_settings
 from elder_companion.summary import DailySummary
 from elder_companion.symptoms.extractor import SymptomExtractor
-from elder_companion.web.routes import alerts, chat, family, pages
+from elder_companion.web.routes import alerts, chat, family, pages, reports
 
 
 def create_app(settings: Settings | None = None, llm: BaseLLMClient | None = None) -> FastAPI:
@@ -50,6 +50,7 @@ def create_app(settings: Settings | None = None, llm: BaseLLMClient | None = Non
     app.include_router(chat.tts_router)
     app.include_router(family.router)
     app.include_router(pages.router)
+    app.include_router(reports.router)
     app.mount("/static", StaticFiles(directory=pages.WEB_DIR / "static"), name="static")
     # Fall snapshots: alert.snapshot_path "snapshots/x.jpg" is served at /media/snapshots/x.jpg.
     snapshots_dir = settings.paths.snapshots_dir

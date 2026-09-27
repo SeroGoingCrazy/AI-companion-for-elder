@@ -410,3 +410,37 @@ body.family {
 @media (prefers-reduced-motion: reduce) {
   .alert-banner { animation: none; }
 }
+
+/* ---------- Printable family pages (doctor one-pager, memoir) ---------- */
+
+.report-page { max-width: 820px; margin: 0 auto; padding: 24px 16px 40px; }
+.report-nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+.report-nav a { color: var(--accent); font-weight: 700; }
+.report-head { border-bottom: 2px solid var(--ink); padding-bottom: 12px; margin-bottom: 18px; }
+.report-head h1 { margin: 0 0 4px; font-size: 28px; font-weight: 800; letter-spacing: -0.01em; }
+.report-who { margin: 0 0 4px; font-size: 17px; }
+.report-section { margin-bottom: 22px; }
+.report-section h2 { margin: 0 0 8px; font-size: 18px; font-weight: 800; }
+.report-flags { margin: 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.report-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.report-table th, .report-table td { text-align: left; vertical-align: top; padding: 6px 8px; }
+.report-table thead th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); border-bottom: 1px solid var(--line); }
+.report-symptom { break-inside: avoid; }
+.report-symptom tr:first-child th, .report-symptom tr:first-child td { border-top: 1px solid var(--line); }
+.report-quotes td { padding-top: 0; }
+.report-quotes ul { margin: 0; padding-left: 18px; }
+.report-quotes q { quotes: "\201C" "\201D"; }
+.report-foot { border-top: 1px solid var(--line); padding-top: 10px; }
+@media (max-width: 600px) {
+  .report-table thead { display: none; }
+  .report-table tr:first-child { display: grid; grid-template-columns: 1fr 1fr; }
+  .report-table tr:first-child th { grid-column: 1 / -1; }
+}
+@media print {
+  body.report { background: #fff; font-size: 12px; }
+  .no-print { display: none !important; }
+  .report-page { max-width: none; padding: 0; }
+  .report-head h1 { font-size: 20px; }
+  .level-badge { border: 1px solid #000; color: #000; background: none !important; }
+  @page { size: letter; margin: 0.6in; }
+}
