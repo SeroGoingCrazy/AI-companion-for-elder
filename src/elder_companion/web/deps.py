@@ -23,7 +23,12 @@ SessionDep = Annotated[Session, Depends(get_session)]
 def get_chat_service(request: Request, session: SessionDep) -> ChatService:
     settings = request.app.state.settings
     return ChatService(
-        session, request.app.state.llm, settings.chat, audio_dir=settings.paths.audio_dir
+        session,
+        request.app.state.llm,
+        settings.chat,
+        audio_dir=settings.paths.audio_dir,
+        agenda=settings.agenda,
+        memory=settings.memory,
     )
 
 

@@ -64,9 +64,11 @@ class MockLLMClient(BaseLLMClient):
     def chat(self, messages: list[ChatMessage], *, max_tokens: int | None = None) -> str:
         self.calls.append(("chat", messages))
         cfg = self.config.get("chat", {})
-        # A conversation ending in a system instruction is a greeting request.
+        # A conversation ending in a system instruction is a greeting request; greet_rules
+        # match that instruction (e.g. a follow-up on the agenda).
         if messages and messages[-1]["role"] == "system":
-            return cfg.get("greet", "Hello! How are you today?")
+            rule = _match(messages[-1]["content"], cfg.get("greet_rules", []))
+            return rule["reply"] if rule else cfg.get("greet", "Hello! How are you today?")
         # system_rules match the first system prompt (e.g. the daily summary's instructions).
         system = messages[0]["content"] if messages and messages[0]["role"] == "system" else ""
         rule = _match(system, cfg.get("system_rules", []))

@@ -35,9 +35,9 @@ def test_demo_script_replays_offline(demo: TestClient) -> None:
     assert c.get("/elder").status_code == 200 and c.get("/family").status_code == 200
     assert c.get("/api/summary/today").json()["empty"] is True
 
-    # 1. Start chatting: greeting follows up on yesterday's knee
+    # 1. Start chatting: the greeting asks how the orchid repotting went (seeded follow-up)
     greet = c.post("/api/chat/greet").json()
-    assert "knee" in greet["reply_text"] and not greet["fallback"]
+    assert "orchid" in greet["reply_text"] and not greet["fallback"]
 
     # 2. Sleep (spoken: the mock transcribes b"MOCK:<text>")
     line = "Much better today, but I didn't sleep well last night."

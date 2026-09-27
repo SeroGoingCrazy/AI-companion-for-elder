@@ -4,6 +4,12 @@
 
 chat:
   greet: "Good morning, Maggie! How is that knee feeling today?"   # one question: tidy_reply keeps only the first
+  # Matched against the greeting instruction (session agenda, first-chat disclosure).
+  greet_rules:
+    - match: ["first chat together"]
+      reply: "Good morning, Maggie! I'm Sunny. You can always ask me to keep something just between us, except your safety, like a fall or chest pain, which I'd always tell Amy about. How are you feeling today?"
+    - match: ["orchid"]
+      reply: "Good morning, Maggie! How did repotting your orchid go?"
   default: "That's lovely to hear, Maggie. Tell me a little more?"
   default_zh: "嗯嗯，我在听呢。能再多跟我说说吗？"
   # Matched against the system prompt, before `rules`.
@@ -11,6 +17,8 @@ chat:
     - match: ["daily update for the family"]
       reply: "Maggie was in good spirits and chatted about her garden. She mentioned feeling dizzy in the mornings and, later, chest tightness with trouble breathing, which raised an emergency alert. Please check in with her today."
   rules:
+    - match: ["between us", "别告诉"]
+      reply: "Of course, this stays between us. Just so you know, if it's ever about your safety, like a fall or chest pain, I'll always let Amy know."
     - match: ["chest", "can't breathe", "can't catch my breath", "胸口", "喘不"]
       reply: "Maggie, that could be serious. Please call 911 right now, and then call Amy. I'm right here with you."
     - match: ["头晕", "头有点晕"]
