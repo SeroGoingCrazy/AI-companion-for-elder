@@ -1,4 +1,5 @@
-"""Background work after each elder message (spec 5.4): symptoms, then companion memory.
+"""Background work after each elder message (spec 5.4): symptoms, companion memory, then
+scrubbing personal details from the turn for the family view (redaction.py).
 
 The two extractions are independent (ADR 17): either can fail without affecting the other.
 Symptoms go first so a red-flag alert reaches the family as fast as possible; its path never
@@ -13,6 +14,7 @@ from elder_companion.alerts.bus import AlertBus, StreamEvent
 from elder_companion.alerts.schemas import AlertOut
 from elder_companion.memory.extractor import MemoryExtractor
 from elder_companion.memory.store import process_message_memory
+from elder_companion.redaction import Redactor, redact_messages
 from elder_companion.settings import Settings
 from elder_companion.symptoms.extractor import SymptomExtractor
 from elder_companion.symptoms.service import run_symptom_pipeline
@@ -24,15 +26,19 @@ def process_elder_message(
     memory_extractor: MemoryExtractor,
     settings: Settings,
     bus: AlertBus | None,
+    redactor: Redactor | None,
     message_id: int,
+    reply_id: int | None = None,
 ) -> list[AlertOut]:
     """Never raises. Publishes alerts as soon as they exist, then one `activity` event once
     memory (and any privacy request) has been applied, so the dashboard reloads a view that
-    already hides what she asked to keep private."""
+    already hides what she asked to keep private and shows the turn redacted."""
     outs, symptoms = run_symptom_pipeline(
         session_factory, symptom_extractor, settings.symptoms, bus, message_id
     )
     process_message_memory(session_factory, memory_extractor, settings, message_id)
+    if redactor is not None:
+        redact_messages(session_factory, redactor, [message_id, reply_id])
     if bus is not None:
         bus.publish(StreamEvent.activity(message_id, symptoms))
     return outs

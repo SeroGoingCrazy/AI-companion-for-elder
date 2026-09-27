@@ -64,6 +64,9 @@ class Message(Base):
     audio_path: Mapped[str | None] = mapped_column(String(255))
     # "Keep this between us": hidden from every family view, still in the agent's context.
     private: Mapped[bool] = mapped_column(default=False, server_default=false())
+    # The text with personal details scrubbed, for family views (redaction.py). NULL until
+    # the background pass has run; readers then fall back to rule-based redaction.
+    family_text: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
 

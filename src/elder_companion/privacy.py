@@ -20,6 +20,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from elder_companion.models import Alert, MemoryItem, Message, SymptomLog, SymptomMention
+from elder_companion.redaction import family_text
 from elder_companion.symptoms.merge import max_severity
 from elder_companion.symptoms.schema import SymptomCatalog, get_catalog
 
@@ -92,7 +93,7 @@ def mark_private(session: Session, message_ids: Collection[int]) -> int:
 class MessageView:
     id: int
     role: str
-    text: str  # "" when private
+    text: str  # "" when private; personal details scrubbed otherwise
     private: bool
     created_at: datetime
 
@@ -101,13 +102,13 @@ def history_page(
     session: Session, elder_id: int, limit: int, before_id: int | None = None
 ) -> list[MessageView]:
     """The latest `limit` messages (older than `before_id` when paging), oldest first, with
-    private ones redacted to a placeholder."""
+    private ones redacted to a placeholder and personal details scrubbed from the rest."""
     stmt = select(Message).where(Message.elder_id == elder_id)
     if before_id is not None:
         stmt = stmt.where(Message.id < before_id)
     rows = reversed(session.scalars(stmt.order_by(Message.id.desc()).limit(limit)).all())
     return [
-        MessageView(m.id, m.role, "" if m.private else m.text, m.private, m.created_at)
+        MessageView(m.id, m.role, "" if m.private else family_text(m), m.private, m.created_at)
         for m in rows
     ]
 

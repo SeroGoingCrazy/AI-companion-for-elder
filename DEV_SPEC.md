@@ -3,7 +3,7 @@
 > Project: **Elder Companion Agent** (an AI companion agent for older adults living alone, plus a family care dashboard)
 > Version: v0.2 (adds companion memory, family loop, parent-controlled privacy, reports)
 > Timeline: 2-day core MVP + 1 day for Stage H; demo location: United States; model provider: OpenAI
-> Build note: Stage H is complete, including family reminders (H5) and the daily digest / weekly report (H7).
+> Build note: Stage H is complete, including family reminders (H5), the daily digest / weekly report (H7), family redaction (H11) and the voice switch (H12).
 > Team: **A (features / lead dev)** — backend, chat, voice, symptom log, family dashboard data; **B (vision / frontend)** — fall detection, UI polish, demo materials
 
 ## Table of Contents
@@ -720,6 +720,9 @@ llm:
   asr_model: ${ASR_MODEL:-gpt-4o-transcribe}
   tts_model: ${TTS_MODEL:-gpt-4o-mini-tts}
   tts_voice: ${TTS_VOICE:-coral}
+  tts_voices:                                # the elder app's voice switch (H12)
+    female: ${TTS_VOICE_FEMALE:-coral}
+    male: ${TTS_VOICE_MALE:-ash}
   tts_instructions: "Speak slowly, warmly and clearly, like a caring family member."
   timeout_s: 15
 chat:
@@ -800,12 +803,12 @@ fall:
 | D | D1 D2 D3 D4 | ✅✅✅✅ |
 | E | E1 E2 E3 E4 E5* | ✅✅✅✅⬜ |
 | F | F1 F2 F3 F4 F5 F6 F7 F8 F9* | ✅✅✅✅✅✅✅✅⬜ |
-| H | H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 | ✅✅✅✅✅✅✅✅✅✅ |
+| H | H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 | ✅✅✅✅✅✅✅✅✅✅✅✅ |
 | G | G1 G2 G3 G4 | ✅⬜⬜⬜ |
 
 ### 📈 Overall Progress
 
-`36 / 41` (* = optional task, not required for delivery)
+`38 / 43` (* = optional task, not required for delivery)
 
 ---
 
@@ -1153,6 +1156,27 @@ fall:
 - **How to test**: `uv run pytest -q tests/unit/test_memoir.py`; manual.
 - **Notes**: the retelling is cached on `memory_item.retelling`; if the model is down the page shows her words and retries on the next load.
 
+### H11 (P1): Personal details scrubbed from the family's view of the conversation ✅
+- **Owner**: A
+- **Goal**: on top of H4's parent-controlled marks, the family never reads personal details in the conversation: phone numbers, emails, addresses, ID / card / account numbers, passwords and PINs, bank balances and bank names, and the surnames of people outside the family. The companion's own context keeps the original words (ADR 22).
+- **Design**: two passes in `redaction.py`. `redact_rules` (regex, deterministic, no network) always runs, also over the LLM's output. `Redactor` makes one `extract_json` call per chat turn (user message + reply; greetings too) with `redact_family.txt` and stores the result in the new nullable `message.family_text`; it runs in the background pipeline after memory, before the `activity` event, so the dashboard reloads an already-redacted turn. On LLM failure the rule-based text is stored. Readers use `family_text(msg)`: the stored text, or rules only for rows not yet processed (seed data, older messages).
+- **Files**: `redaction.py`, `config/prompts/redact_family.txt`, `models.py`, `privacy.py`, `summary.py`, `pipeline.py`, `web/app.py`, `web/deps.py`, `web/routes/chat.py`, `config/mock_llm.yaml`, `tests/unit/test_redaction.py`, `tests/integration/test_family_redaction.py`.
+- **Acceptance**:
+  - "My bank PIN is 4821 and Amy's number is 555-123-4567" → `/api/messages` shows `[password]` and `[phone number]`, keeps the rest of the sentence, and the stored `message.text` is unchanged.
+  - Today's summary prompt never contains those details.
+  - Ordinary talk (symptoms, times, blood pressure "140/90", dates, first names) is left unchanged.
+- **How to test**: `uv run pytest -q tests/unit/test_redaction.py tests/integration/test_family_redaction.py`.
+- **Notes**: checked against the real model: "Rosa Diaz at 12 Oak Lane … Chase savings has about 80,000 dollars, PIN 4821" → "Rosa at [address] … [financial detail] savings has about [financial detail], PIN [password]". Costs one extra (background) LLM call per turn. Not yet applied: symptom `raw_quote`s on the timeline / doctor one-pager and memoir excerpts.
+
+### H12 (P2): Woman's / man's voice switch ✅
+- **Owner**: A
+- **Goal**: a two-button switch in the elder app header ("Woman's voice" / "Man's voice"), remembered per device in `localStorage`; switching replays the latest reply in the new voice.
+- **Design**: `llm.tts_voices` maps a key to an OpenAI voice (`female: coral`, `male: ash`, overridable via `TTS_VOICE_FEMALE` / `TTS_VOICE_MALE`). `GET /api/tts/{id}?voice=male` (unknown key → 422, no param → `tts_voice`); audio is cached per voice as `{id}.{voice}.mp3`. The browser-voice fallback picks a voice whose name suggests the chosen gender when one is installed.
+- **Files**: `settings.py`, `config/settings.yaml`, `llm/client.py`, `llm/mock.py`, `chat/service.py`, `web/routes/chat.py`, `web/routes/pages.py`, `web/templates/elder.html`, `web/static/elder.js`, `web/static/style.css`, `tests/integration/test_tts.py`, `tests/integration/test_pages.py`.
+- **Acceptance**: the switch renders on `/elder`; `?voice=male` and `?voice=female` each generate once and are then cached; `?voice=robot` → 422.
+- **How to test**: `uv run pytest -q tests/integration/test_tts.py tests/integration/test_pages.py`; manual: switch voices in the elder app.
+- **Notes**: verified in the browser with the real model (male mp3 returned). Browsers that loaded the elder app before this change need a hard refresh (static files are not versioned).
+
 ---
 
 ## Stage G: Wrap-up (goal: a stable, well-told demo)
@@ -1261,3 +1285,4 @@ fall:
 | 19 | High-level red flags always bypass privacy; the rule is disclosed up front and in the moment | Honor every privacy request; make all symptoms bypass | Keeps the safety floor deterministic while the privacy promise stays meaningful for everything else |
 | 20 | Reminders and follow-ups share one agenda, carried only by the greeting with a budget of 3 | Inject everything into every turn | Deterministic delivery status; never interrupts; avoids the checklist feel |
 | 21 | Doctor one-pager is rendered from structured data without an LLM | LLM-written summary | Doctors need exact words and dates; nothing can be invented |
+| 22 | Family view of the conversation = redacted copy (`message.family_text`, LLM pass + regex rules always), original kept for the companion | Redact before saving; regex only; show the family summaries only | The AI keeps her words; rules give a deterministic floor even when the model is down; the family still sees what she actually talked about |

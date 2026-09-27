@@ -34,6 +34,7 @@ from elder_companion.privacy import (
     visible_symptoms,
 )
 from elder_companion.prompts import render_prompt
+from elder_companion.redaction import family_text
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +113,7 @@ def fingerprint(
     request (which usually arrives after the content it covers)."""
     parts = [
         str(messages[-1].id if messages else 0),
+        ",".join(str(m.family_text is None) for m in messages),  # redacted since (H11)
         ",".join(f"{s.id}:{s.count}:{s.status}:{s.severity}" for s in symptoms),
         ",".join(str(a.id) for a in alerts),
         ",".join(str(i) for i in private_ids),
@@ -144,7 +146,7 @@ def format_notes(
     """The user message: that day's transcript, symptom log and alerts, with local times."""
     transcript = [
         f"[{_hhmm(m.created_at, now)}] {'Elder' if m.role == 'user' else companion_name}: "
-        f"{_clip(m.text)}"
+        f"{_clip(family_text(m))}"
         for m in list(messages)[-MAX_MESSAGES:]
     ]
     symptom_lines = []

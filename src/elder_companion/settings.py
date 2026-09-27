@@ -36,6 +36,8 @@ class LLMSettings(_Model):
     asr_prompt: str = ""  # biases transcription style, e.g. Simplified Chinese
     tts_model: str
     tts_voice: str
+    # Voices the elder can pick in the app (key -> provider voice name).
+    tts_voices: dict[str, str] = {"female": "coral", "male": "ash"}
     tts_instructions: str
     vision_model: str
     timeout_s: float = 15

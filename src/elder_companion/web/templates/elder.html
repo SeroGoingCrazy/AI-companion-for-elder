@@ -26,6 +26,10 @@
         <h1>{{ companion_name }}</h1>
         <p class="subtitle">Here for you, {{ nickname }}</p>
       </div>
+      <div id="voice-switch" class="voice-switch" role="group" aria-label="{{ companion_name }}'s voice">
+        <button type="button" data-voice="female" aria-pressed="true">Woman's voice</button>
+        <button type="button" data-voice="male" aria-pressed="false">Man's voice</button>
+      </div>
     </header>
 
     <section id="start-screen" class="start">

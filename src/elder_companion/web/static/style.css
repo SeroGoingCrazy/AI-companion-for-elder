@@ -61,6 +61,21 @@ button, input { font: inherit; }
 .elder-header h1 { margin: 0; font-size: 34px; font-weight: 800; line-height: 1.05; letter-spacing: -0.01em; }
 .subtitle { margin: 2px 0 0; color: var(--muted); font-size: 22px; }
 .avatar { width: 56px; height: 56px; flex: none; fill: var(--sun); stroke: var(--sun); }
+.voice-switch {
+  margin-left: auto; display: flex; flex: none; padding: 4px; gap: 4px;
+  background: var(--surface); border: 2px solid var(--line); border-radius: 999px;
+}
+.voice-switch button {
+  min-height: 48px; padding: 0 16px; border: 0; border-radius: 999px; background: transparent;
+  color: var(--muted); font: inherit; font-size: 18px; font-weight: 700; cursor: pointer;
+}
+.voice-switch button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+.voice-switch button:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+@media (max-width: 520px) {
+  .elder-header { flex-wrap: wrap; }
+  .voice-switch { margin-left: 0; width: 100%; }
+  .voice-switch button { flex: 1; }
+}
 
 /* Start screen: the sun is below the horizon until Maggie taps. */
 .start {

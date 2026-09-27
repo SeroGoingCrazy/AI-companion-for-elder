@@ -34,7 +34,11 @@ def elder_page(request: Request, session: SessionDep, elder_id: int | None = Non
         {
             "companion_name": companion_name,
             "nickname": elder.nickname,
-            "app_config": {"elderId": elder.id, "nickname": elder.nickname},
+            "app_config": {
+                "elderId": elder.id,
+                "nickname": elder.nickname,
+                "voices": list(request.app.state.settings.llm.tts_voices),
+            },
         },
     )
 
