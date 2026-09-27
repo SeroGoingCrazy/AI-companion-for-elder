@@ -1,5 +1,5 @@
 /* Family dashboard: today's summary, alerts (live over SSE), symptom timeline, fall view,
- * conversation history.
+ * conversation history, care list, and sibling sharing (who is handling what).
  *
  * GET /api/alerts/stream sends `alert` (new alert: banner + sound) and `activity` (the elder
  * said something: reload the timeline and history). All text is inserted with textContent.
@@ -15,6 +15,7 @@
   const HISTORY_PAGE = 30;
   const ACTIVITY_DEBOUNCE_MS = 800;
   const FALL_RETRY_MS = 15000;
+  const MEMBER_KEY = "family.memberId";
 
   // ---------- helpers ----------
 
@@ -116,7 +117,7 @@
           " ", a.title),
         a.content ? el("p", { class: "alert-content", text: a.content }) : null,
         el("p", { class: "meta", text: `${isFall ? "Fall detection" : "From chat"} · ${fmtWhen(a.created_at)}` })),
-      snapshot, read);
+      snapshot, read, claimWidget("alert", a.id));
   }
 
   function renderAlerts() {
@@ -254,9 +255,11 @@
 
   function historyItem(m) {
     const who = m.role === "user" ? cfg.nickname : "Companion";
-    return el("li", { class: `history-msg ${m.role}` },
+    return el("li", { class: `history-msg ${m.role}${m.private ? " is-private" : ""}` },
       el("p", { class: "meta", text: `${who} · ${fmtWhen(m.created_at)}` }),
-      el("p", { class: "history-text", text: m.text }));
+      m.private
+        ? el("p", { class: "history-text private-note", text: `Kept private at ${cfg.nickname}'s request` })
+        : el("p", { class: "history-text", text: m.text }));
   }
 
   async function loadHistory() {
@@ -304,6 +307,138 @@
     img.src = url;
   }
 
+  // ---------- family members (siblings share this page; ?member= picks who is acting) ----------
+
+  const members = cfg.members || [];
+  let memberId = null;
+
+  function readStoredMember() {
+    try { return Number(localStorage.getItem(MEMBER_KEY)) || null; } catch { return null; }
+  }
+
+  function setMember(id, { remember = true } = {}) {
+    memberId = members.some((m) => m.id === id) ? id : (members[0] && members[0].id);
+    $("member-select").value = String(memberId);
+    if (remember) {
+      try { localStorage.setItem(MEMBER_KEY, String(memberId)); } catch { /* private mode */ }
+      const url = new URL(location.href);
+      url.searchParams.set("member", String(memberId));
+      history.replaceState(null, "", url);
+    }
+    renderAlerts();
+    renderCareList();
+  }
+
+  function initMembers() {
+    const select = $("member-select");
+    select.replaceChildren(...members.map((m) => el("option", { value: m.id, text: `${m.name} (${m.relation})` })));
+    select.closest(".member-picker").hidden = members.length === 0;
+    select.addEventListener("change", () => setMember(Number(select.value)));
+    setMember(cfg.memberId || readStoredMember(), { remember: Boolean(cfg.memberId) });
+  }
+
+  const memberName = (id) => (members.find((m) => m.id === id) || {}).name || "Someone";
+
+  // ---------- claims ("Ben: I'll call her doctor") ----------
+
+  const claims = new Map(); // "alert:12" -> newest claim for that target
+
+  async function loadClaims() {
+    try {
+      const list = await api("/api/claims");
+      claims.clear();
+      for (const c of list) {
+        const key = `${c.target_type}:${c.target_id}`;
+        if (!claims.has(key)) claims.set(key, c); // newest first
+      }
+      renderAlerts();
+      renderCareList();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function saveClaim(targetType, targetId, note) {
+    try {
+      const c = await api("/api/claims", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_type: targetType, target_id: targetId, member_id: memberId, note }),
+      });
+      claims.set(`${targetType}:${targetId}`, c);
+    } catch (e) {
+      console.error(e);
+    }
+    renderAlerts();
+    renderCareList();
+  }
+
+  async function finishClaim(c) {
+    try {
+      claims.set(`${c.target_type}:${c.target_id}`, await api(`/api/claims/${c.id}/done`, { method: "POST" }));
+    } catch (e) {
+      console.error(e);
+    }
+    renderAlerts();
+    renderCareList();
+  }
+
+  function claimForm(targetType, targetId, box) {
+    const input = el("input", { type: "text", class: "claim-input", maxlength: "500",
+      placeholder: "e.g. I'll call her doctor", "aria-label": "What you'll do (optional)" });
+    const form = el("form", { class: "claim-form" }, input,
+      el("button", { type: "submit", class: "btn btn-small btn-attention", text: "Save" }),
+      el("button", { type: "button", class: "btn btn-small", text: "Cancel",
+        onclick: () => box.replaceWith(claimWidget(targetType, targetId)) }));
+    form.addEventListener("submit", (ev) => { ev.preventDefault(); saveClaim(targetType, targetId, input.value.trim()); });
+    box.replaceChildren(form);
+    input.focus();
+  }
+
+  function claimWidget(targetType, targetId) {
+    const c = claims.get(`${targetType}:${targetId}`);
+    const box = el("div", { class: "claim" });
+    if (c && c.done_at) {
+      box.append(el("span", { class: "claim-badge is-done", text: `✓ Handled by ${c.member_name}` }));
+    } else if (c) {
+      const who = c.member_id === memberId ? "You are" : `${c.member_name} is`;
+      box.append(
+        el("span", { class: "claim-badge", text: `${who} handling this${c.note ? `: “${c.note}”` : ""}` }),
+        el("button", { type: "button", class: "btn btn-small", text: "Mark done", onclick: () => finishClaim(c) }));
+    } else if (memberId != null) {
+      box.append(el("button", { type: "button", class: "btn btn-small", text: "I'll handle this",
+        onclick: () => claimForm(targetType, targetId, box) }));
+    }
+    return box;
+  }
+
+  // ---------- care list ----------
+
+  let careItems = [];
+
+  function renderCareList() {
+    const list = $("care-list");
+    if (!list) return;
+    list.replaceChildren(...careItems.map((i) =>
+      el("li", { class: "care-item" },
+        el("p", { class: "care-title" },
+          el("span", { class: `care-kind care-${i.kind}`, text: i.kind === "person" ? "Person" : "Topic" }),
+          " ", i.subject,
+          el("span", { class: "meta", text: ` · ${i.mention_count} mentions, last ${fmtWhen(i.last_seen)}` })),
+        i.raw_quote ? el("blockquote", { class: "quote", text: i.raw_quote }) : null,
+        claimWidget("memory_item", i.id))));
+    $("care-empty").hidden = careItems.length > 0;
+  }
+
+  async function loadCareList() {
+    try {
+      careItems = await api("/api/care-list");
+      renderCareList();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   // ---------- live updates ----------
 
   let activityTimer = null;
@@ -316,7 +451,7 @@
 
     source.addEventListener("open", () => {
       setLive("live", "Live");
-      if (dropped) { loadAlerts(); loadSymptoms(); loadHistory(); } // catch up on missed events
+      if (dropped) { loadAlerts(); loadSymptoms(); loadHistory(); loadCareList(); loadClaims(); } // catch up
       dropped = false;
     });
     source.addEventListener("error", () => {
@@ -333,7 +468,10 @@
     source.addEventListener("activity", () => {
       setSummaryStale(true);
       clearTimeout(activityTimer);
-      activityTimer = setTimeout(() => { loadSymptoms(); loadHistory(); }, ACTIVITY_DEBOUNCE_MS);
+      // After each turn: new symptoms / memory, and a privacy request may hide earlier items.
+      activityTimer = setTimeout(() => {
+        loadSymptoms(); loadHistory(); loadCareList(); loadAlerts();
+      }, ACTIVITY_DEBOUNCE_MS);
     });
   }
 
@@ -345,8 +483,11 @@
   $("sound-btn").addEventListener("click", () => setSound(!soundOn));
   $("history-older").addEventListener("click", loadOlderHistory);
 
+  initMembers();
   loadSummary();
   loadAlerts();
+  loadClaims();
+  loadCareList();
   loadSymptoms();
   loadHistory();
   connectFallStream();

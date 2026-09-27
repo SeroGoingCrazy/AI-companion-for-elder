@@ -48,10 +48,10 @@
         <tbody class="report-symptom">
           <tr>
             <th scope="row">{% if s.red_flag %}<span class="level-badge level-high">Emergency sign</span> {% endif %}{{ s.name }}{% if s.name_zh %} <span class="meta">{{ s.name_zh }}</span>{% endif %}</th>
-            <td>{{ fmt_date(s.first_seen) }}{% if fmt_date(s.last_seen) != fmt_date(s.first_seen) %} – {{ fmt_date(s.last_seen) }}{% endif %}</td>
-            <td>{{ s.count }}</td>
-            <td>{{ "not stated" if s.max_severity == "unknown" else s.max_severity }}</td>
-            <td>{{ "improving" if s.status == "improved" else s.status }}</td>
+            <td data-label="Mentioned">{{ fmt_date(s.first_seen) }}{% if fmt_date(s.last_seen) != fmt_date(s.first_seen) %} – {{ fmt_date(s.last_seen) }}{% endif %}</td>
+            <td data-label="Times">{{ s.count }}</td>
+            <td data-label="Worst">{{ "not stated" if s.max_severity == "unknown" else s.max_severity }}</td>
+            <td data-label="Status">{{ "improving" if s.status == "improved" else s.status }}</td>
           </tr>
           <tr class="report-quotes">
             <td colspan="5">
