@@ -3,7 +3,7 @@
 > Project: **Elder Companion Agent** (an AI companion agent for older adults living alone, plus a family care dashboard)
 > Version: v0.2 (adds companion memory, family loop, parent-controlled privacy, reports)
 > Timeline: 2-day core MVP + 1 day for Stage H; demo location: United States; model provider: OpenAI
-> Build note: Stage H ships with family reminders (H5). The daily digest / weekly report (H7) is still deferred (see the Stage H notes).
+> Build note: Stage H is complete, including family reminders (H5) and the daily digest / weekly report (H7).
 > Team: **A (features / lead dev)** — backend, chat, voice, symptom log, family dashboard data; **B (vision / frontend)** — fall detection, UI polish, demo materials
 
 ## Table of Contents
@@ -120,7 +120,7 @@ Beyond health, the agent remembers the ordinary things a friend would: on Monday
 
 ### 2.8 Reports
 
-- **Weekly report** *(deferred: not built in this version, H7)*: one page covering the mood trend (a daily 1–5 score), the most-discussed topics, a symptom summary (what, how often, getting better or worse), and reminder adherence. It is built only from non-private data.
+- **Weekly report**: one page covering the mood trend (a daily 1–5 score), the most-discussed topics, a symptom summary (what, how often, getting better or worse), and reminder adherence. It is built only from non-private data.
 - **One-pager for the doctor**: a printable symptom log for the last N days. For each symptom it shows first/last seen, count, max severity, and status, with the parent's exact words and timestamps; it also lists red-flag alerts and reminder adherence. It is rendered from structured data by a template, with no LLM involved, so nothing can be invented.
 
 ### 2.9 Key Demo Metrics (to be filled in during Stage G)
@@ -447,8 +447,8 @@ reminder(id, elder_id, from_member_id, text,
          schedule_time, schedule_date, active, created_at)     -- daily HH:MM or one-off date
 reminder_log(id, reminder_id, date, status[mentioned|confirmed|declined|no_response],
              message_id, created_at, updated_at)               -- unique (reminder_id, date)
--- deferred (H7), not created in this version:
-daily_digest(id, elder_id, date, summary, mood_score, topics_json, has_private, generated_at)
+daily_digest(id, elder_id, date, summary, mood_score, topics_json, has_private,
+             fingerprint, generated_at)      -- unique (elder_id, date); fingerprint: rebuild when the day changes
 claim(id, elder_id, target_type[alert|memory_item|symptom_log], target_id,
       member_id, note, created_at, done_at)
 ```
@@ -691,7 +691,7 @@ elder_companion.family_agent (E5) ──▶ accesses fall data only through the 
 | GET | `/api/claims` | Claims, newest first, with `member_name` and `done_at` | A |
 | POST | `/api/claims` | `{target_type, target_id, member_id, note}` → claim | A |
 | POST | `/api/claims/{id}/done` | Mark handled | A |
-| GET | `/family/report/weekly?week=` | *(deferred, H7)* Weekly report page (printable) | A (B: styling) |
+| GET | `/family/report/weekly?week=` | Weekly report page (printable); `week=0` is the last 7 days | A (B: styling) |
 | GET | `/family/doctor?days=30` | Doctor one-pager page (printable, no LLM) | A (B: styling) |
 | GET | `/family/memoir` | Memoir page | A (B: styling) |
 | GET | `/api/summary/today` | `{summary, generated_at, fallback, empty, has_private}` | A |
@@ -800,12 +800,12 @@ fall:
 | D | D1 D2 D3 D4 | ✅✅✅✅ |
 | E | E1 E2 E3 E4 E5* | ✅✅✅✅⬜ |
 | F | F1 F2 F3 F4 F5 F6 F7 F8 F9* | ✅✅✅✅✅✅✅✅⬜ |
-| H | H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 | ✅✅✅✅✅✅⏸✅✅✅ |
+| H | H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 | ✅✅✅✅✅✅✅✅✅✅ |
 | G | G1 G2 G3 G4 | ✅⬜⬜⬜ |
 
 ### 📈 Overall Progress
 
-`35 / 41` (* = optional task, not required for delivery; ⏸ = deferred: H7 digest / weekly report, in progress)
+`36 / 41` (* = optional task, not required for delivery)
 
 ---
 
@@ -1111,15 +1111,24 @@ fall:
 - **Files**: `reports/doctor.py`, `web/routes/reports.py`, `web/templates/doctor.html`, `web/static/style.css`, `tests/unit/test_doctor_report.py`.
 - **Acceptance**: prints to ≤ 2 Letter pages; every quote matches a stored `raw_quote`; private non-red-flag symptoms are absent; it makes no LLM call (the test uses a client that raises).
 - **How to test**: `uv run pytest -q tests/unit/test_doctor_report.py`; manual print preview.
-- **Notes**: no reminder-adherence section yet (H5 landed after this). Log rows of the same symptom are combined into one line; the 4 most recent quotes are shown with a count of earlier ones, which keeps the page short.
+- **Notes**: no reminder-adherence section (the weekly report covers adherence). Log rows of the same symptom are combined into one line; the 4 most recent quotes are shown with a count of earlier ones, which keeps the page short.
 
-### H7 (P1): Daily digest and weekly report ⏸ deferred
-> Not built yet; next up. E2's summary keeps its own cache and now reads through `privacy.py`, with the private-day note added in code. Reminder adherence (H5) is now available for the report's adherence section.
+### H7 (P1): Daily digest and weekly report ✅
 - **Owner**: A (B: styling)
 - **Goal**: `daily_summary.txt` → structured `{summary, mood_score, topics}` stored in `daily_digest` (3.10), with E2 reading from it. Weekly report page: mood line, top topics, symptom counts and trend, reminder adherence, and a 2–3 sentence overview.
 - **Files**: `reports/digest.py`, `reports/weekly.py`, `summary.py`, `config/prompts/daily_summary.txt`, `config/prompts/weekly_report.txt`, `web/templates/report_weekly.html`, `tests/unit/test_weekly_aggregate.py`.
 - **Acceptance**: with seeded history the report shows 7 mood points, the top 3 topics, symptom trends, and adherence; days with private segments carry the private note and no private content.
-- **How to test**: `uv run pytest -q tests/unit/test_weekly_aggregate.py` (mock digests); manual view.
+- **How to test**: `uv run pytest -q tests/unit/test_weekly_aggregate.py` (mock digests),
+  `tests/integration/test_weekly_report.py`; manual view and print preview.
+- **Notes**: the digest row is the cache, keyed by a fingerprint of the day's messages, symptoms,
+  alerts and privacy marks, so E2's separate TTL cache is gone (it could serve a stale summary for
+  minutes right after she spoke). A privacy request drops the digests for the days it touches
+  (`digest.invalidate`), because the request normally arrives after the day was already summarized.
+  The weekly page reuses stored digests for past days and only builds today, so it is one model
+  call for the overview. Every number on the page is computed in code from `visible_symptoms` and
+  `reminder_log`; the model only writes the overview, and with the model down the page still shows
+  the full mood line, tables and adherence. `seed_history` writes six digests so the demo opens
+  with a real mood line instead of seven live calls.
 
 ### H8 (P1): Care list ✅
 - **Owner**: A
@@ -1190,6 +1199,7 @@ fall:
 | 6 | Switch to the dashboard and play the fall video | Detection view shows FALLING → DOWN; fall alert + snapshot pops up |
 | 7 | Refresh today's summary on the dashboard | Summary covers sleep, dizziness, and the chest-tightness alert, plus "asked to keep part of today's conversation private" |
 | 8 | Switch to Ben (`?member=ben`), claim the chest alert: "I'll call her doctor"; open the doctor one-pager and Maggie's stories | Amy's view shows "Ben is handling this"; one-pager lists symptoms with exact words; memoir shows her teaching story |
+| 8b | Open the weekly report | Mood line over 7 days with the mid-week dip, top topics led by the knee, one grouped row per symptom with its direction, and the pill's adherence dots; prints to one page |
 | 9 | Dashboard "Ask AI": "Did Mom fall today? Anything else I should know?" (E5) | Answer cites the fall time + symptoms (no Linda); tool_calls are shown |
 | 10 | Switch to Claude Desktop and ask the same question (F8) | Returns events and snapshots via fall-mcp — showing the capability is reusable |
 
