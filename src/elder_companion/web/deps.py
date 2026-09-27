@@ -42,9 +42,9 @@ def get_alert_bus(request: Request) -> AlertBus:
 AlertBusDep = Annotated[AlertBus, Depends(get_alert_bus)]
 
 
-def get_symptom_pipeline(request: Request) -> Callable[[int], object]:
-    """`pipeline(user_message_id)`: run as a BackgroundTask after a chat turn (symptoms, then
-    companion memory)."""
+def get_symptom_pipeline(request: Request) -> Callable[..., object]:
+    """`pipeline(user_message_id, reply_id)`: run as a BackgroundTask after a chat turn
+    (symptoms, companion memory, then family redaction)."""
     state = request.app.state
     return partial(
         process_elder_message,
@@ -53,7 +53,8 @@ def get_symptom_pipeline(request: Request) -> Callable[[int], object]:
         state.memory_extractor,
         state.settings,
         state.alert_bus,
+        state.redactor,
     )
 
 
-SymptomPipelineDep = Annotated[Callable[[int], object], Depends(get_symptom_pipeline)]
+SymptomPipelineDep = Annotated[Callable[..., object], Depends(get_symptom_pipeline)]

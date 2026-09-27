@@ -28,6 +28,7 @@ from elder_companion.privacy import (
     DEFAULT_BYPASS_LEVELS,
     PRIVATE_DAY_NOTE,
     SymptomView,
+    family_text,
     visible_alerts,
     visible_messages,
     visible_symptoms,
@@ -72,7 +73,7 @@ def format_notes(
     """The user message: today's transcript, symptom log and alerts, with local times."""
     transcript = [
         f"[{_hhmm(m.created_at, now)}] {'Elder' if m.role == 'user' else companion_name}: "
-        f"{_clip(m.text)}"
+        f"{_clip(family_text(m))}"
         for m in list(messages)[-MAX_MESSAGES:]
     ]
     symptom_lines = []
@@ -198,6 +199,7 @@ class DailySummary:
     def _fingerprint(messages, symptoms, alerts) -> tuple:  # noqa: ANN001
         return (
             messages[-1].id,
+            tuple(m.family_text is None for m in messages),  # redacted since
             tuple((s.id, s.count, s.status, s.severity) for s in symptoms),
             tuple(a.id for a in alerts),
         )

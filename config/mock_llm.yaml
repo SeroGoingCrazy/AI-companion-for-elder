@@ -39,6 +39,9 @@ chat:
 # so quotes here are the shortest keyword that the rule matches on. Rules that match either
 # language list one entry per language; the one whose quote is absent gets dropped.
 json:
+  # No echo offline: an empty result makes redaction.py fall back to its rule-based pass.
+  family_redaction:
+    default: {messages: []}
   symptom_extraction:
     default: {symptoms: []}
     rules:

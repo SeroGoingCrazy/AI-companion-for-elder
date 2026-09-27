@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from elder_companion.chat.service import ChatResult, MessageNotFound
 from elder_companion.elders import ElderNotFound
+from elder_companion.redaction import redact_messages
 from elder_companion.web.deps import ChatServiceDep, SymptomPipelineDep
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -88,9 +89,10 @@ class ChatOut(BaseModel):
 def schedule_symptoms(
     result: ChatResult, tasks: BackgroundTasks, pipeline: SymptomPipelineDep
 ) -> None:
-    """Extract symptoms after the response is sent, so chat latency is unaffected."""
+    """Extract symptoms (and redact the turn for the family) after the response is sent, so
+    chat latency is unaffected."""
     if result.user_message_id is not None:
-        tasks.add_task(pipeline, result.user_message_id)
+        tasks.add_task(pipeline, result.user_message_id, result.message_id)
 
 
 @router.post("", response_model=ChatOut)
@@ -129,12 +131,17 @@ def chat_audio(
 
 
 @router.post("/greet", response_model=ChatOut)
-def greet(service: ChatServiceDep, body: GreetIn | None = None) -> ChatOut:
+def greet(
+    request: Request, service: ChatServiceDep, tasks: BackgroundTasks, body: GreetIn | None = None
+) -> ChatOut:
     """Opening line when the elder app starts; body is optional."""
     try:
-        return ChatOut.of(service.greet(body.elder_id if body else None))
+        result = service.greet(body.elder_id if body else None)
     except ElderNotFound as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
+    state = request.app.state
+    tasks.add_task(redact_messages, state.sessionmaker, state.redactor, [result.message_id])
+    return ChatOut.of(result)
 
 
 @tts_router.get(
