@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from elder_companion.llm.mock import MOCK_AUDIO_PREFIX
+from elder_companion.privacy import PRIVATE_DAY_NOTE
 from elder_companion.seed import seed_history
 from elder_companion.settings import Settings
 from elder_companion.web.app import create_app
@@ -46,11 +47,21 @@ def test_demo_script_replays_offline(demo: TestClient) -> None:
         files={"audio": ("blob", MOCK_AUDIO_PREFIX + line.encode(), "audio/webm")},
     ).json()
     assert r["user_text"] == line and "night" in r["reply_text"]
+    # 2b. Asked before sharing: hidden until she says yes
+    assert "let Amy know" in r["reply_text"]
+    assert "insomnia" not in _today(c)
+    held = [m for m in c.get("/api/messages").json() if m["awaiting_consent"]]
+    assert len(held) == 2 and all(m["text"] == "" for m in held)  # her line + the question
+    r = c.post("/api/chat", json={"text": "Yes, you can tell her."}).json()
+    assert "Amy" in r["reply_text"]
     assert "insomnia" in _today(c)
+    assert any(m["text"] == line for m in c.get("/api/messages").json())
 
-    # 3. Dizziness: on the timeline, no alert
+    # 3. Dizziness: asked, agreed, then on the timeline, no alert
     r = c.post("/api/chat", json={"text": "这两天早上起来头有点晕"}).json()
-    assert "头晕" in r["reply_text"]
+    assert "头晕" in r["reply_text"] and "Amy" in r["reply_text"]
+    assert "dizziness" not in _today(c)
+    c.post("/api/chat", json={"text": "可以，告诉她吧"})
     assert "dizziness" in _today(c)
     assert [a for a in c.get("/api/alerts").json() if not a["is_read"]] == []
 
@@ -76,7 +87,7 @@ def test_demo_script_replays_offline(demo: TestClient) -> None:
     summary = c.get("/api/summary/today?refresh=true").json()
     assert not summary["empty"] and not summary["fallback"]
     assert "dizzy" in summary["summary"] and "emergency" in summary["summary"]
-    assert "keep part of today's conversation private" in summary["summary"]
+    assert summary["summary"].endswith(PRIVATE_DAY_NOTE.format(nickname="Maggie"))
     assert "Linda" not in summary["summary"]
 
     # 8. Ben claims the chest alert; Amy's view shows it; doctor one-pager and memoir

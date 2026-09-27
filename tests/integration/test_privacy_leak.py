@@ -7,6 +7,7 @@ from datetime import datetime
 import pytest
 from fastapi.testclient import TestClient
 
+from elder_companion.privacy import PRIVATE_DAY_NOTE
 from elder_companion.seed import seed_history
 from elder_companion.settings import Settings
 from elder_companion.web.app import create_app
@@ -71,7 +72,7 @@ def test_private_words_reach_no_family_view(client: TestClient) -> None:
     assert _leaks(client) == {}
     summary = client.get("/api/summary/today").json()
     assert summary["has_private"]
-    assert summary["summary"].endswith("Maggie asked to keep part of today's conversation private.")
+    assert summary["summary"].endswith(PRIVATE_DAY_NOTE.format(nickname="Maggie"))
     history = client.get("/api/messages").json()
     assert [m["text"] for m in history[-2:]] == ["", ""] and history[-2]["private"]
     assert history[-4]["text"] == "I watered the roses this morning"  # outside the request
