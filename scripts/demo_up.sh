@@ -8,6 +8,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# The app reads PORT itself (config/settings.yaml); everything printed below has to agree
+# with it, or the script hands out an address nothing is listening on.
+PORT="${PORT:-8000}"
+FALL_PORT="${FALL_MCP_PORT:-8001}"
+BASE="http://127.0.0.1:${PORT}"
+
 WITH_OPENAI=0
 [[ "${1:-}" == "--openai" ]] && WITH_OPENAI=1
 
@@ -39,19 +45,19 @@ cleanup() { for p in "${PIDS[@]:-}"; do kill "$p" 2>/dev/null || true; done; }
 trap cleanup EXIT INT TERM
 
 say "3/4  Services"
-if port_busy 8000; then
-  echo "     :8000 already in use, leaving it alone"
+if port_busy "$PORT"; then
+  echo "     :$PORT already in use, leaving it alone"
 else
   uv run --no-sync elder-web >/tmp/sunny-web.log 2>&1 &
-  PIDS+=($!); echo "     web app   :8000"
+  PIDS+=($!); echo "     web app   :$PORT"
 fi
 
 if [[ $VISION -eq 1 ]]; then
-  if port_busy 8001; then
-    echo "     :8001 already in use, leaving it alone"
+  if port_busy "$FALL_PORT"; then
+    echo "     :$FALL_PORT already in use, leaving it alone"
   else
     uv run --no-sync --extra vision python -m fall_detector.server >/tmp/sunny-fall.log 2>&1 &
-    PIDS+=($!); echo "     fall-mcp  :8001"
+    PIDS+=($!); echo "     fall-mcp  :$FALL_PORT"
   fi
 else
   echo "     fall detection skipped (run scripts/fetch_demo_media.py to enable it)"
@@ -59,19 +65,19 @@ fi
 
 for _ in $(seq 1 40); do
   sleep 1
-  curl -sf -o /dev/null http://127.0.0.1:8000/healthz && break
+  curl -sf -o /dev/null "$BASE/healthz" && break
 done
-curl -sf -o /dev/null http://127.0.0.1:8000/healthz || { echo "web app did not come up; see /tmp/sunny-web.log" >&2; exit 1; }
+curl -sf -o /dev/null "$BASE/healthz" || { echo "web app did not come up; see /tmp/sunny-web.log" >&2; exit 1; }
 
 say "4/4  Ready"
 cat <<TXT
-     Elder app   http://127.0.0.1:8000/elder
-     Dashboard   http://127.0.0.1:8000/family
+     Elder app   $BASE/elder
+     Dashboard   $BASE/family
      Chinese     add ?lang=zh to either
 
      A phone needs HTTPS to install the app; a LAN address will not do:
-       cloudflared tunnel --url http://127.0.0.1:8000
-       ssh -R 80:localhost:8000 nokey@localhost.run     # where Cloudflare is blocked
+       cloudflared tunnel --url $BASE
+       ssh -R 80:localhost:$PORT nokey@localhost.run     # where Cloudflare is blocked
 
      Ctrl-C stops everything.
 TXT
