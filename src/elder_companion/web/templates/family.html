@@ -1,14 +1,14 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ lang }}" dir="{{ t.dir }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#F2F5F8">
-  <title>{{ elder.nickname }}'s day</title>
+  <meta name="theme-color" content="#F6F2EA">
+  <title>{{ t.family.title.format(nickname=elder.nickname) }}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;700;800&display=swap">
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;700&family=Fraunces:opsz,wght@9..144,700&display=swap">
+  <link rel="stylesheet" href="/static/family.css">
   <link rel="manifest" href="/manifest-family.webmanifest">
   <meta name="apple-mobile-web-app-title" content="{{ companion_name }} Care">
   <!-- iOS ignores the manifest: these three meta tags are what make "Add to Home Screen"
@@ -26,89 +26,88 @@
       <p id="banner-content" class="alert-banner-content"></p>
       <p id="banner-time" class="alert-banner-time"></p>
     </div>
-    <div class="alert-banner-actions">
-      <button id="banner-read" type="button" class="btn btn-light">Mark as read</button>
-      <button id="banner-close" type="button" class="btn btn-ghost-light" aria-label="Dismiss">✕</button>
+    <div class="actions">
+      <button id="banner-read" type="button" class="btn btn-light">{{ t.family.mark_as_read }}</button>
+      <button id="banner-close" type="button" class="btn btn-ghost-light" aria-label="{{ t.family.mark_as_read }}">✕</button>
     </div>
   </div>
 
   <main class="dash">
     <header class="dash-header">
-      <div class="dash-brand">
-        <svg class="avatar" viewBox="0 0 48 48" aria-hidden="true">
-          <circle cx="24" cy="24" r="11" />
-          <g stroke-width="3.5" stroke-linecap="round">
-            <line x1="24" y1="3" x2="24" y2="8" /><line x1="24" y1="40" x2="24" y2="45" />
-            <line x1="3" y1="24" x2="8" y2="24" /><line x1="40" y1="24" x2="45" y2="24" />
-            <line x1="9.2" y1="9.2" x2="12.7" y2="12.7" /><line x1="35.3" y1="35.3" x2="38.8" y2="38.8" />
-            <line x1="9.2" y1="38.8" x2="12.7" y2="35.3" /><line x1="35.3" y1="12.7" x2="38.8" y2="9.2" />
-          </g>
-        </svg>
-        <div>
-          <h1>{{ elder.nickname }}'s day</h1>
-          <p class="dash-sub">{{ elder.name }}, chatting with {{ companion_name }}</p>
-        </div>
+      <svg class="avatar" viewBox="0 0 48 48" aria-hidden="true">
+        <circle class="disc" cx="24" cy="24" r="10.5" />
+        <g class="ray" stroke-width="3.5" stroke-linecap="round">
+          <line x1="24" y1="4" x2="24" y2="9" /><line x1="24" y1="39" x2="24" y2="44" />
+          <line x1="4" y1="24" x2="9" y2="24" /><line x1="39" y1="24" x2="44" y2="24" />
+          <line x1="9.9" y1="9.9" x2="13.4" y2="13.4" /><line x1="34.6" y1="34.6" x2="38.1" y2="38.1" />
+          <line x1="9.9" y1="38.1" x2="13.4" y2="34.6" /><line x1="34.6" y1="13.4" x2="38.1" y2="9.9" />
+        </g>
+      </svg>
+      <div>
+        <h1>{{ t.family.title.format(nickname=elder.nickname) }}</h1>
+        <p class="meta">{{ t.family.subtitle.format(name=elder.name, companion=companion_name) }}</p>
       </div>
-      <div class="dash-header-tools">
-        <button id="sound-btn" type="button" class="btn btn-quiet" aria-pressed="false">🔕 Sound off</button>
-        <span id="live" class="live" data-state="connecting"><span class="dot" aria-hidden="true"></span><span id="live-text">Connecting…</span></span>
+      <div class="header-tools">
+        <button id="sound-btn" type="button" class="btn btn-quiet" aria-pressed="false">🔕 {{ t.family.sound_off }}</button>
+        <span id="live" class="live" data-state="connecting"><span class="dot" aria-hidden="true"></span><span id="live-text">{{ t.family.connecting }}</span></span>
+        <button id="lang-btn" class="btn lang-switch" type="button" data-next="{{ other_lang }}">{{ t.switch_to }}</button>
       </div>
     </header>
 
-    <section class="card summary-card" aria-labelledby="summary-h">
+    <!-- 1. the one answer the reader came for -->
+    <section class="summary-card" aria-labelledby="summary-h">
       <div class="card-head">
-        <h2 id="summary-h">Today</h2>
-        <button id="summary-refresh" type="button" class="btn btn-quiet">Refresh</button>
+        <h2 id="summary-h">{{ t.family.today }}</h2>
+        <button id="summary-refresh" type="button" class="btn btn-quiet">{{ t.family.refresh }}</button>
       </div>
-      <p id="summary-text" class="summary-text">Loading…</p>
+      <p id="summary-text" class="summary-text">{{ t.family.loading }}</p>
       <p id="summary-meta" class="meta"></p>
     </section>
 
+    <!-- 2. everything that happened, newest first -->
     <section class="card alerts-card" aria-labelledby="alerts-h">
-      <div class="card-head">
-        <h2 id="alerts-h">Alerts <span id="unread-count" class="count-badge" hidden></span></h2>
-      </div>
+      <h2 id="alerts-h">{{ t.family.alerts }} <span id="unread-count" class="count-badge" hidden></span></h2>
       <ul id="alert-list" class="alert-list"></ul>
-      <p id="alerts-empty" class="empty" hidden>No alerts. All quiet.</p>
-    </section>
-
-    <section class="card fall-card" aria-labelledby="fall-h">
-      <div class="card-head">
-        <h2 id="fall-h">Fall detection</h2>
-        <span id="fall-status" class="meta">Connecting…</span>
-      </div>
-      <div class="fall-view">
-        <img id="fall-stream" alt="Live fall-detection view" hidden>
-        <p id="fall-offline" class="fall-offline">Fall detection is offline.</p>
-      </div>
+      <p id="alerts-empty" class="empty" hidden>{{ t.family.no_alerts }}</p>
     </section>
 
     <section class="card symptoms-card" aria-labelledby="symptoms-h">
-      <div class="card-head">
-        <h2 id="symptoms-h">Symptoms, past 7 days</h2>
-      </div>
-      <div class="legend" aria-label="Legend">
-        <span class="chip sev-red">Emergency sign</span>
-        <span class="chip sev-severe">Severe</span>
-        <span class="chip sev-moderate">Moderate</span>
-        <span class="chip sev-mild">Mild</span>
-        <span class="chip sev-unknown">Not stated</span>
-      </div>
+      <h2 id="symptoms-h">{{ t.family.symptoms }}</h2>
+      <ul class="legend" aria-label="Legend">
+        <li class="sev-red_flag">{{ t.severity.red_flag }}</li>
+        <li class="sev-severe">{{ t.severity.severe }}</li>
+        <li class="sev-moderate">{{ t.severity.moderate }}</li>
+        <li class="sev-mild">{{ t.severity.mild }}</li>
+        <li class="sev-unknown">{{ t.severity.unknown }}</li>
+      </ul>
       <ol id="timeline" class="timeline"></ol>
+    </section>
+
+    <!-- 3. supporting detail, on demand -->
+    <section class="card fall-card" aria-labelledby="fall-h">
+      <div class="card-head">
+        <h2 id="fall-h">{{ t.family.fall_title }}</h2>
+        <span id="fall-status" class="meta">{{ t.family.connecting }}</span>
+      </div>
+      <div class="fall-view">
+        <img id="fall-stream" alt="{{ t.family.fall_title }}" hidden>
+        <p id="fall-offline" class="fall-offline">{{ t.family.fall_offline }}</p>
+      </div>
     </section>
 
     <section class="card history-card">
       <details id="history">
-        <summary><h2>Conversation</h2> <span id="history-meta" class="meta"></span></summary>
-        <button id="history-older" type="button" class="btn btn-quiet history-older" hidden>Load earlier messages</button>
+        <summary><h2>{{ t.family.conversation }}</h2> <span id="history-meta" class="meta"></span></summary>
+        <button id="history-older" type="button" class="btn btn-quiet history-older" hidden>{{ t.family.load_earlier }}</button>
         <ol id="history-list" class="history-list"></ol>
       </details>
     </section>
 
-    <footer class="dash-footer">Summaries and symptom notes are generated by AI from {{ elder.nickname }}'s chats and may be incomplete. They are not medical advice.</footer>
+    <footer class="dash-footer">{{ t.family.ai_note.format(nickname=elder.nickname) }}</footer>
   </main>
 
   <script>window.APP_CONFIG = {{ app_config | tojson }};</script>
+  <script src="/static/lang.js" defer></script>
   <script src="/static/family.js" defer></script>
   <script src="/static/pwa.js" defer></script>
 </body>

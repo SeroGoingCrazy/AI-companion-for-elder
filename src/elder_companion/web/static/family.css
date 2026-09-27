@@ -1,0 +1,216 @@
+/* The family surface.
+ *
+ * Structure follows what shipped care dashboards converge on — Oura's Today / Vitals /
+ * My Health and ElliQ's Dashboard / Notifications / Reminders both resolve to the same
+ * three things, in this order:
+ *
+ *   1. one surfaced answer      — is she alright today?
+ *   2. one merged timeline      — everything that happened, newest first, alerts and
+ *                                 symptoms and falls in a single stream rather than a
+ *                                 separate card per source
+ *   3. supporting detail        — the live camera, the full chat log, on demand
+ *
+ * Neither of them uses a widget grid, and that is the point: a grid makes the reader
+ * assemble the answer from four boxes. A stream hands it to them.
+ *
+ * Same tokens as the elder surface, but the type is at normal adult sizes: this is read
+ * by a working-age family member on a phone between other things, not by the elder.
+ */
+
+@import url("/static/tokens.css");
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--face-ui);
+  font-size: var(--t-body);
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+
+.dash {
+  max-width: 760px;              /* one column, always: a stream does not need two */
+  margin: 0 auto;
+  padding: max(18px, env(safe-area-inset-top)) var(--gutter)
+           max(28px, env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: 22px;
+}
+
+/* ---------- urgent banner ---------- */
+
+.alert-banner {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: flex-start; gap: 14px;
+  /* A sibling of .dash, not a child, so it is already full-bleed: no negative margin. */
+  padding: 15px var(--gutter) 16px;
+  background: var(--alarm); color: #fff;
+}
+.alert-banner-title { margin: 0; font-size: 19px; font-weight: 700; }
+.alert-banner-content { margin: 3px 0 0; font-size: var(--t-body); }
+.alert-banner-time { margin: 3px 0 0; font-size: var(--t-meta); opacity: .85; }
+.alert-banner .actions { margin-left: auto; display: flex; gap: 8px; flex: none; }
+
+/* ---------- header ---------- */
+
+.dash-header { display: flex; align-items: center; gap: 13px; flex-wrap: wrap; }
+.dash-header .avatar { width: 38px; height: 38px; flex: none; }
+.dash-header .disc { fill: var(--amber); }
+.dash-header .ray { stroke: var(--amber); }
+.dash-header h1 {
+  font-family: var(--face-display); font-weight: 700; font-size: 27px;
+  margin: 0; letter-spacing: -0.015em; line-height: 1.15;
+}
+.dash-header .meta { margin: 1px 0 0; color: var(--ink-2); font-size: var(--t-meta); }
+.header-tools { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+.live { display: inline-flex; align-items: center; gap: 7px; font-size: var(--t-meta); color: var(--ink-2); }
+.live .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ink-3); }
+.live[data-state="live"] .dot { background: var(--calm); }
+.live[data-state="connecting"] .dot,
+.live[data-state="reconnecting"] .dot { background: var(--watch); }
+
+/* ---------- 1. the answer ---------- */
+
+.summary-card { }
+.summary-card h2 {
+  font-size: var(--t-meta); font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--ink-3); margin: 0 0 9px;
+}
+.summary-text {
+  font-family: var(--face-display); font-weight: 700;
+  font-size: clamp(23px, 5vw, 29px); line-height: 1.38;
+  letter-spacing: -0.015em; margin: 0;
+}
+.summary-card .meta { margin: 11px 0 0; color: var(--ink-3); font-size: var(--t-meta); }
+.card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+
+/* ---------- 2. the stream ---------- */
+
+.card {
+  background: var(--paper-lift); border: 1px solid var(--rule);
+  border-radius: var(--r-panel); padding: 19px; box-shadow: var(--lift-1);
+}
+.card > h2 { font-size: 20px; font-weight: 700; margin: 0 0 13px; letter-spacing: -0.01em; }
+
+.count-badge {
+  display: inline-block; margin-left: 8px; padding: 2px 10px;
+  border-radius: var(--r-chip); background: var(--alarm); color: #fff;
+  font-size: var(--t-meta); font-weight: 700; vertical-align: middle;
+}
+
+.alert-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 11px; }
+.alert-item {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 3px 12px; align-items: start;
+  padding: 13px 15px; border-radius: var(--r-card);
+  border: 1px solid var(--rule); border-left-width: 5px;
+}
+.alert-item.level-high { border-left-color: var(--alarm); background: var(--alarm-wash); }
+.alert-item.level-medium { border-left-color: var(--watch); background: var(--watch-wash); }
+.alert-item.is-read { opacity: .58; }
+.alert-icon { grid-row: span 3; font-size: 21px; line-height: 1.2; }
+.alert-title { margin: 0; font-weight: 700; font-size: 18px; }
+.alert-content { margin: 2px 0 0; color: var(--ink-2); }
+.alert-item .meta { margin: 2px 0 0; color: var(--ink-3); font-size: var(--t-meta); }
+
+.level-badge {
+  display: inline-block; margin-right: 7px; padding: 1px 9px; border-radius: var(--r-chip);
+  font-size: 13px; font-weight: 700; color: #fff; vertical-align: 2px;
+}
+.level-badge.level-high { background: var(--alarm); }
+.level-badge.level-medium { background: var(--watch); }
+
+.empty { color: var(--ink-3); margin: 0; }
+
+/* ---------- symptom timeline ---------- */
+
+.legend { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 15px; padding: 0; list-style: none; }
+.legend li {
+  padding: 3px 11px; border-radius: var(--r-chip); font-size: 13px; font-weight: 700;
+  border: 1px solid transparent;
+}
+.sev-red_flag { background: var(--alarm); color: #fff; }
+.sev-severe   { background: var(--alarm-wash); color: var(--alarm); border-color: #E9C4B9; }
+.sev-moderate { background: var(--watch-wash); color: var(--watch); border-color: #E7D2B0; }
+.sev-mild     { background: var(--calm-wash); color: var(--calm); border-color: #C3DBCB; }
+.sev-unknown  { background: var(--paper); color: var(--ink-2); border-color: var(--rule); }
+
+.timeline { list-style: none; margin: 0; padding: 0; }
+.day { position: relative; padding: 0 0 15px 21px; border-left: 2px solid var(--rule); margin-left: 6px; }
+.day::before {
+  content: ""; position: absolute; left: -8px; top: 5px; width: 13px; height: 13px;
+  border-radius: 50%; background: var(--amber); border: 2px solid var(--ink);
+}
+.day.is-empty::before { background: var(--paper-lift); border-color: var(--rule); }
+.day:last-child { padding-bottom: 0; }
+.day-label { margin: 0 0 6px; font-size: var(--t-meta); font-weight: 700; }
+.day.is-empty .day-label { color: var(--ink-3); font-weight: 400; }
+
+/* Quiet days are grouped in family.js into a single row that names the range, so the
+   record stays complete. See timelineRows(). */
+.quiet-run { margin: 0; color: var(--ink-3); font-size: var(--t-meta); }
+.day.is-empty .meta { margin: 2px 0 0; color: var(--ink-3); font-size: 13px; }
+
+.symptom-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.symptom summary {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 9px; cursor: pointer;
+  list-style: none; min-height: 40px;
+}
+.symptom summary::-webkit-details-marker { display: none; }
+.symptom summary::after { content: "\203A"; color: var(--ink-3); }
+.symptom[open] summary::after { transform: rotate(90deg); }
+
+/* ---------- 3. supporting detail ---------- */
+
+.fall-card { background: var(--ink); border-color: var(--ink); color: var(--paper-lift); }
+.fall-card > .card-head h2 { color: var(--paper-lift); }
+.fall-card .meta { color: #B8ABA0; }
+.fall-view {
+  margin-top: 12px; border-radius: var(--r-card); overflow: hidden;
+  background: #171310; aspect-ratio: 4 / 3;
+  display: grid; place-items: center;
+}
+.fall-view img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.fall-offline { color: #9D8F84; margin: 0; font-size: var(--t-meta); text-align: center; padding: 0 16px; }
+
+.history-card summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 10px; }
+.history-card summary::-webkit-details-marker { display: none; }
+.history-card summary h2 { display: inline; font-size: 20px; margin: 0; }
+.history-list { list-style: none; margin: 13px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.history-msg { padding: 11px 14px; border-radius: var(--r-card); background: var(--paper); border: 1px solid var(--rule); }
+.history-msg.user { align-self: flex-end; background: var(--amber-wash); border-color: #EADCC0; }
+.history-msg .meta { margin: 0 0 3px; color: var(--ink-3); font-size: 13px; }
+.history-msg p:last-child { margin: 0; }
+
+.dash-footer { color: var(--ink-3); font-size: var(--t-meta); text-align: center; line-height: 1.5; }
+
+/* ---------- controls ---------- */
+
+.btn {
+  min-height: 40px; padding: 0 15px; border-radius: var(--r-chip); cursor: pointer;
+  font-family: var(--face-ui); font-size: var(--t-meta); font-weight: 700;
+  border: 1px solid var(--rule); background: var(--paper-lift); color: var(--ink);
+}
+.btn:active { background: var(--amber-wash); }
+.btn-quiet { background: var(--paper-lift); }
+.btn-small { min-height: 36px; padding: 0 12px; }
+.btn-light { background: #fff; color: var(--alarm); border-color: #fff; }
+.btn-ghost-light { background: transparent; color: #fff; border-color: rgba(255,255,255,.55); }
+.lang-switch { min-height: 40px; }
+
+@media (max-width: 480px) {
+  .alert-item { grid-template-columns: auto minmax(0, 1fr); }
+  .alert-item > .btn { grid-column: 2; justify-self: start; margin-top: 7px; }
+  .alert-banner { flex-direction: column; }
+  .alert-banner .actions { margin-left: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

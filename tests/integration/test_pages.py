@@ -1,3 +1,6 @@
+import json
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -17,7 +20,11 @@ def test_elder_page_renders_persona_and_config(client: TestClient) -> None:
     assert "<title>Sunny</title>" in html
     assert "Hello, Maggie!" in html
     assert 'id="mic-btn"' in html
-    assert 'window.APP_CONFIG = {"elderId": 1, "nickname": "Maggie"}' in html
+    # Assert on what the page hands the scripts, not on the literal: the object grows
+    # (language, string table) and an exact-match test would break on every addition.
+    cfg = json.loads(re.search(r"window\.APP_CONFIG = (\{.*?\});", html, re.S).group(1))
+    assert cfg["elderId"] == 1
+    assert cfg["nickname"] == "Maggie"
     assert "call 911" in html
 
 
@@ -25,7 +32,17 @@ def test_elder_page_unknown_elder_404(client: TestClient) -> None:
     assert client.get("/elder?elder_id=99").status_code == 404
 
 
-@pytest.mark.parametrize("path", ["/static/elder.js", "/static/style.css"])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/static/elder.js",
+        "/static/family.js",
+        "/static/lang.js",
+        "/static/tokens.css",
+        "/static/elder.css",
+        "/static/family.css",
+    ],
+)
 def test_static_assets_served(client: TestClient, path: str) -> None:
     assert client.get(path).status_code == 200
 

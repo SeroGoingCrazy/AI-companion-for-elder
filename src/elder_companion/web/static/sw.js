@@ -16,7 +16,10 @@ const RUNTIME = `${VERSION}-runtime`;
 // Same-origin assets worth having before the first offline load. The two pages are not
 // precached: they are per-elder server-rendered HTML, handled network-first below.
 const SHELL_ASSETS = [
-  "/static/style.css",
+  "/static/tokens.css",
+  "/static/elder.css",
+  "/static/family.css",
+  "/static/lang.js",
   "/static/elder.js",
   "/static/family.js",
   "/static/icons/icon-192.png",

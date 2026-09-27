@@ -11,14 +11,19 @@
   const $ = (id) => document.getElementById(id);
   const tz = cfg.timezone || undefined;
 
-  const STATUS_TEXT = { new: "new", ongoing: "ongoing", improved: "improving", resolved: "resolved" };
+  // Server-rendered strings for the chosen language (config/i18n/<lang>.yaml).
+  const S = cfg.t || {};
+  const SEV = cfg.severity || {};
+  const STATUS_TEXT = cfg.status || { new: "new", ongoing: "ongoing", improved: "improving", resolved: "resolved" };
   const HISTORY_PAGE = 30;
   const ACTIVITY_DEBOUNCE_MS = 800;
   const FALL_RETRY_MS = 15000;
 
   // ---------- helpers ----------
 
-  const LOCALE = "en-US"; // the page is English; don't mix in the browser's date language
+  // Dates follow the interface language, not the browser's, so a switch to Chinese
+  // does not leave "Sat, Sep 26" sitting next to Chinese text.
+  const LOCALE = cfg.lang === "zh" ? "zh-CN" : "en-US";
 
   const timeFmt = new Intl.DateTimeFormat(LOCALE, { timeZone: tz, hour: "numeric", minute: "2-digit" });
   const dayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });
@@ -32,7 +37,7 @@
     const today = dayFmt.format(new Date());
     const yesterday = dayFmt.format(new Date(Date.now() - 864e5));
     if (day === today) return fmtTime(iso);
-    if (day === yesterday) return `Yesterday ${fmtTime(iso)}`;
+    if (day === yesterday) return `${S.yesterday} ${fmtTime(iso)}`;
     return `${dateFmt.format(d)} ${fmtTime(iso)}`;
   }
 
@@ -67,21 +72,21 @@
   async function loadSummary(refresh = false) {
     const btn = $("summary-refresh");
     btn.disabled = true;
-    btn.textContent = "Updating…";
+    btn.textContent = S.updating;
     try {
       const s = await api(`/api/summary/today${refresh ? "?refresh=true" : ""}`);
       $("summary-text").textContent = s.summary;
       $("summary-text").classList.toggle("muted", s.empty);
       $("summary-meta").textContent = s.empty
         ? ""
-        : `Updated ${fmtTime(s.generated_at)}${s.fallback ? " · AI summary unavailable, showing a plain list" : ""}`;
+        : `${window.fmt(S.updated, { time: fmtTime(s.generated_at) })}${s.fallback ? ` · ${S.fallback_note}` : ""}`;
       setSummaryStale(false);
     } catch (e) {
       console.error(e);
-      $("summary-meta").textContent = "Couldn't load the summary. Try Refresh.";
+      $("summary-meta").textContent = S.summary_failed;
     } finally {
       btn.disabled = false;
-      btn.textContent = "Refresh";
+      btn.textContent = S.refresh;
     }
   }
 
@@ -89,8 +94,8 @@
     summaryStale = stale;
     $("summary-refresh").classList.toggle("btn-attention", stale);
     const meta = $("summary-meta");
-    if (stale && !meta.textContent.includes("New activity")) {
-      meta.textContent = [meta.textContent, "New activity since this summary"].filter(Boolean).join(" · ");
+    if (stale && !meta.textContent.includes(S.new_activity)) {
+      meta.textContent = [meta.textContent, S.new_activity].filter(Boolean).join(" · ");
     }
   }
 
@@ -103,19 +108,19 @@
     const isFall = a.type === "fall";
     const snapshot = a.snapshot_path
       ? el("a", { class: "snapshot", href: `/media/${a.snapshot_path}`, target: "_blank", rel: "noopener" },
-          el("img", { src: `/media/${a.snapshot_path}`, alt: "Snapshot at the time of the fall", loading: "lazy" }))
+          el("img", { src: `/media/${a.snapshot_path}`, alt: S.snapshot_alt, loading: "lazy" }))
       : null;
     const read = a.is_read
       ? null
-      : el("button", { class: "btn btn-quiet btn-small", type: "button", text: "Mark read", onclick: () => markRead(a.id) });
+      : el("button", { class: "btn btn-quiet btn-small", type: "button", text: S.mark_read, onclick: () => markRead(a.id) });
     return el("li", { class: `alert-item level-${a.level}${a.is_read ? " is-read" : ""}`, "data-id": a.id },
       el("div", { class: "alert-icon", "aria-hidden": "true", text: isFall ? "🧍" : "🩺" }),
       el("div", { class: "alert-main" },
         el("p", { class: "alert-title" },
-          el("span", { class: `level-badge level-${a.level}`, text: a.level === "high" ? "Urgent" : "Watch" }),
+          el("span", { class: `level-badge level-${a.level}`, text: a.level === "high" ? S.urgent : S.watch }),
           " ", a.title),
         a.content ? el("p", { class: "alert-content", text: a.content }) : null,
-        el("p", { class: "meta", text: `${isFall ? "Fall detection" : "From chat"} · ${fmtWhen(a.created_at)}` })),
+        el("p", { class: "meta", text: `${isFall ? S.from_fall : S.from_chat} · ${fmtWhen(a.created_at)}` })),
       snapshot, read);
   }
 
@@ -125,13 +130,13 @@
     $("alerts-empty").hidden = list.length > 0;
     const unread = list.filter((a) => !a.is_read).length;
     $("unread-count").hidden = unread === 0;
-    $("unread-count").textContent = `${unread} new`;
+    $("unread-count").textContent = window.fmt(S.unread, { n: unread });
     document.title = `${unread ? `(${unread}) ` : ""}${cfg.nickname}'s day`;
   }
 
   async function loadAlerts() {
     try {
-      const list = await api("/api/alerts?limit=30");
+      const list = await api(`/api/alerts?limit=30&lang=${encodeURIComponent(cfg.lang || "en")}`);
       alerts.clear();
       for (const a of list) alerts.set(a.id, a);
       renderAlerts();
@@ -165,7 +170,7 @@
     banner.dataset.level = a.level;
     $("banner-title").textContent = a.title;
     $("banner-content").textContent = a.content || (a.type === "fall" ? "A fall was detected." : "");
-    $("banner-time").textContent = `${a.type === "fall" ? "Fall detection" : "From chat"} · ${fmtWhen(a.created_at)}`;
+    $("banner-time").textContent = `${a.type === "fall" ? S.from_fall : S.from_chat} · ${fmtWhen(a.created_at)}`;
     banner.hidden = false;
     if (sound) beep(a.level);
   }
@@ -214,14 +219,18 @@
   // ---------- symptom timeline ----------
 
   function symptomRow(s) {
+    // The API carries both names for every canonical (SymptomOut.display_en / display_zh),
+    // so the interface language picks one; "other" has no canonical name and keeps the
+    // model's own wording, which is already in whatever language she spoke.
+    const name = s.canonical === "other" ? s.label : (cfg.lang === "zh" ? s.display_zh : s.display_en);
+    const sev = SEV[s.severity] || s.severity;
     const details = [
-      s.body_part && `Where: ${s.body_part}`,
-      s.duration && `How long: ${s.duration}`,
-      s.onset && `When: ${s.onset}`,
-      `Severity: ${s.severity === "unknown" ? "not stated" : s.severity}`,
-      `Last mentioned ${fmtTime(s.last_seen)}`,
+      s.body_part && window.fmt(S.detail_where, { v: s.body_part }),
+      s.duration && window.fmt(S.detail_duration, { v: s.duration }),
+      s.onset && window.fmt(S.detail_onset, { v: s.onset }),
+      window.fmt(S.detail_severity, { v: sev }),
+      window.fmt(S.detail_last_seen, { time: fmtTime(s.last_seen) }),
     ].filter(Boolean);
-    const name = s.canonical === "other" ? s.label : s.display_en;
     return el("li", { class: "symptom" },
       el("details", {},
         el("summary", {},
@@ -233,27 +242,69 @@
           el("p", { class: "meta", text: details.join(" · ") }))));
   }
 
+
   async function loadSymptoms() {
     try {
       const data = await api("/api/symptoms?days=7");
-      const days = data.days.map((d) =>
-        el("li", { class: `day${d.symptoms.length ? "" : " is-empty"}` },
-          el("h3", { class: "day-label", text: d.label }),
-          d.symptoms.length
-            ? el("ul", { class: "symptom-list" }, ...d.symptoms.map(symptomRow))
-            : el("p", { class: "empty", text: "Nothing mentioned" })));
-      $("timeline").replaceChildren(...days);
+      $("timeline").replaceChildren(...timelineRows(data.days));
     } catch (e) {
       console.error(e);
     }
   }
+
+  /** The API labels days in English; on a phone the label is re-derived so it matches the
+   *  interface language and the elder's time zone. */
+  function dayLabel(iso) {
+    const key = (d) => dayFmt.format(d);
+    const d = new Date(`${iso}T12:00:00Z`);
+    if (key(d) === key(new Date())) return S.today;
+    if (key(d) === key(new Date(Date.now() - 864e5))) return S.yesterday;
+    return dateFmt.format(d);
+  }
+
+  /** Quiet days collapse into one row.
+   *
+   *  Seven rows each saying "nothing mentioned" filled more than half the card on a phone,
+   *  and the answer the reader wants — was anything mentioned — was buried in the middle of
+   *  it. Collapsing keeps every day accounted for: the row still names the range it covers,
+   *  so nothing silently disappears from the record. */
+  function timelineRows(days) {
+    const rows = [];
+    for (let i = 0; i < days.length; ) {
+      const d = days[i];
+      if (d.symptoms.length) {
+        rows.push(el("li", { class: "day" },
+          el("h3", { class: "day-label", text: dayLabel(d.date) }),
+          el("ul", { class: "symptom-list" }, ...d.symptoms.map(symptomRow))));
+        i += 1;
+        continue;
+      }
+      let j = i;
+      while (j < days.length && !days[j].symptoms.length) j += 1;
+      const run = days.slice(i, j);
+      const text = run.length === 1
+        ? window.fmt(S.quiet_one, { day: dayLabel(run[0].date) })
+        : window.fmt(S.quiet_days, {
+            from: dayLabel(run[run.length - 1].date),
+            to: dayLabel(run[0].date),
+          });
+      rows.push(el("li", { class: "day is-empty" },
+        el("p", { class: "quiet-run", text }),
+        run.length > 2
+          ? el("p", { class: "meta", text: window.fmt(S.days_quiet, { n: run.length }) })
+          : null));
+      i = j;
+    }
+    return rows;
+  }
+
 
   // ---------- conversation history ----------
 
   let oldestId = null;
 
   function historyItem(m) {
-    const who = m.role === "user" ? cfg.nickname : "Companion";
+    const who = m.role === "user" ? cfg.nickname : S.companion_role;
     return el("li", { class: `history-msg ${m.role}` },
       el("p", { class: "meta", text: `${who} · ${fmtWhen(m.created_at)}` }),
       el("p", { class: "history-text", text: m.text }));
@@ -267,7 +318,7 @@
       $("history-older").hidden = msgs.length < HISTORY_PAGE;
       const todayKey = dayFmt.format(new Date());
       const today = msgs.filter((m) => m.role === "user" && dayFmt.format(new Date(m.created_at)) === todayKey).length;
-      $("history-meta").textContent = `${today} message${today === 1 ? "" : "s"} from ${cfg.nickname} today`;
+      $("history-meta").textContent = window.fmt(S.messages_today, { n: today, nickname: cfg.nickname });
     } catch (e) {
       console.error(e);
     }
@@ -293,12 +344,12 @@
     img.onload = () => {
       img.hidden = false;
       $("fall-offline").hidden = true;
-      $("fall-status").textContent = "Live";
+      $("fall-status").textContent = S.live;
     };
     img.onerror = () => {
       img.hidden = true;
       $("fall-offline").hidden = false;
-      $("fall-status").textContent = "Offline";
+      $("fall-status").textContent = S.offline;
       setTimeout(() => { img.src = `${url}?t=${Date.now()}`; }, FALL_RETRY_MS);
     };
     img.src = url;
@@ -311,17 +362,19 @@
   function connectAlertStream() {
     const live = $("live");
     const setLive = (state, text) => { live.dataset.state = state; $("live-text").textContent = text; };
-    const source = new EventSource("/api/alerts/stream");
+    // The page language can come from ?lang=, which the cookie does not know about,
+    // so it is passed explicitly rather than left to the server to guess.
+    const source = new EventSource(`/api/alerts/stream?lang=${encodeURIComponent(cfg.lang || "en")}`);
     let dropped = false;
 
     source.addEventListener("open", () => {
-      setLive("live", "Live");
+      setLive("live", S.live);
       if (dropped) { loadAlerts(); loadSymptoms(); loadHistory(); } // catch up on missed events
       dropped = false;
     });
     source.addEventListener("error", () => {
       dropped = true;
-      setLive("down", "Reconnecting…"); // EventSource retries by itself
+      setLive("down", S.reconnecting); // EventSource retries by itself
     });
     source.addEventListener("alert", (ev) => {
       const a = JSON.parse(ev.data);

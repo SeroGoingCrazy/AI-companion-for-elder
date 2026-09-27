@@ -1,0 +1,72 @@
+/* Design tokens.
+ *
+ * Grounded in what shipped elsewhere rather than invented:
+ *   - Warm canvas, warm neutrals. Every elder- or care-facing product we looked at
+ *     (ElliQ #f6f3ee, Oura #f7f1e8, Papa #fff7e9, Lottie #fffbf5) sits on warm paper.
+ *     A cool blue-grey ground reads clinical, and blue-tinted greys are the most common
+ *     tell of a palette nobody chose.
+ *   - Elevation is a zero-offset blur tinted with the ink colour, after Birdie
+ *     (0 0 11px #00264d40). Never a black drop shadow.
+ *   - Radii vary by element size (ElliQ and Birdie both ship 20/30/40), so the shapes
+ *     read as decisions rather than one token applied everywhere.
+ *
+ * Accessibility floors, which the elder surface must not cross:
+ *   body >= 22px          WeChat Care Mode (Android care level = 22px, x1.4)
+ *   tap target >= 48px    NN/g senior guidance, above Apple's 44pt
+ *   contrast >= 4.5:1     WeChat elder spec and the MIIT national standard
+ *   line-height >= 1.3    MIIT
+ * Measured ratios are noted next to each colour; they are against --paper unless said.
+ */
+
+:root {
+  /* canvas and ink — warm, not blue-grey */
+  --paper:      #F6F2EA;   /* warm paper */
+  --paper-lift: #FDFBF7;   /* cards, one step up from the page */
+  --ink:        #241E19;   /* warm near-black.           14.8:1 on paper */
+  --ink-2:      #5C5149;   /* secondary text.             6.9:1 on paper */
+  --ink-3:      #786D63;   /* meta text.                  4.5:1 on paper */
+  --rule:       #E3D9C9;   /* hairlines */
+
+  /* one committed accent, warm and saturated */
+  --amber:      #E0900F;   /* controls.        ink on amber 6.4:1 */
+  --amber-deep: #A96A06;   /* the solid edge under a pressed control */
+  --amber-wash: #FBEFD8;   /* tint behind amber content */
+
+  /* state — these carry meaning, so they are the only other hues */
+  --alarm:      #B3341B;   /* red flag.        white on alarm 6.1:1 */
+  --alarm-wash: #FBE7E2;
+  --watch:      #9A6510;   /* worth noticing.  white on watch 5.0:1 */
+  --watch-wash: #FAEBD6;
+  --calm:       #2F6A46;   /* speaking, all-clear. white on calm 6.4:1 */
+  --calm-wash:  #E3F0E7;
+
+  /* type: two voices with a gap in the middle.
+     Display is 700, body is 400. Nothing sits at 500, which is what keeps
+     headings and body from blurring into one texture. */
+  --face-display: "Fraunces", Georgia, "Songti SC", serif;
+  --face-ui: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", system-ui,
+             "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+
+  /* elder surface: large by default, per the care-mode floor */
+  --t-elder-body: 23px;
+  --t-elder-say:  25px;
+  --t-elder-lead: 21px;
+
+  /* family surface: read by adults on a phone or a laptop, so a normal scale */
+  --t-body:  17px;
+  --t-lead:  20px;
+  --t-meta:  15px;
+
+  /* radii scale with the element, they are not one token */
+  --r-chip: 999px;
+  --r-card: 20px;
+  --r-panel: 28px;
+  --r-control: 18px;
+
+  /* elevation: a tinted halo, never a black drop shadow */
+  --lift-1: 0 0 10px rgba(36, 30, 25, 0.10);
+  --lift-2: 0 0 18px rgba(36, 30, 25, 0.14);
+
+  --gutter: 22px;
+  --tap: 48px;   /* minimum interactive size */
+}
