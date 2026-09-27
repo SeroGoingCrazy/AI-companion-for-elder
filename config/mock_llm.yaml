@@ -17,10 +17,10 @@ chat:
   default_zh: "嗯嗯，我在听呢。能再多跟我说说吗？"
   # Matched against the system prompt, before `rules`.
   system_rules:
+    - match: ["opening paragraph of a weekly report"]
+      reply: "Maggie had a mixed week: a rough patch mid-week with a bad knee day and two nights of poor sleep, then a real lift over the weekend. Her knee came up on four of the seven days and is the thing most worth watching. She took her blood pressure pill on most of the days it was raised."
     - match: ["keepsake memoir"]
       reply: "This is one of the stories I love to tell, and I'm glad my family will keep it."
-    - match: ["daily update for the family"]
-      reply: "Maggie was in good spirits and chatted about her garden. She mentioned feeling dizzy in the mornings and, later, chest tightness with trouble breathing, which raised an emergency alert. Please check in with her today."
   rules:
     - match: ["between us", "别告诉"]
       reply: "Of course, this stays between us. Just so you know, if it's ever about your safety, like a fall or chest pain, I'll always let Amy know."
@@ -100,6 +100,24 @@ json:
                duration: null, onset: null, status: ongoing, raw_quote: knee}
             - {canonical: joint_pain, label: 膝盖疼, body_part: knee, severity: unknown,
                duration: null, onset: null, status: ongoing, raw_quote: 膝盖}
+  # daily_digest: rules match the last paragraph of the notes, which is the alerts block.
+  daily_digest:
+    default:
+      summary: "Maggie chatted for a little while and seemed like her usual self."
+      mood_score: 3
+      topics: [chat]
+    rules:
+      - match: ["Chest pain", "Shortness of breath"]
+        result:
+          summary: "Maggie was in good spirits and chatted about her garden. She mentioned feeling dizzy in the mornings and, later, chest tightness with trouble breathing, which raised an emergency alert. Please check in with her today."
+          mood_score: 2
+          topics: [garden, sleep, dizziness]
+      - match: ["Fall detected"]
+        result:
+          summary: "A fall was detected at home today. Maggie chatted as usual otherwise."
+          mood_score: 2
+          topics: [fall]
+
   # memory_extraction: "$current_message_id" is replaced with the id of the utterance.
   memory_extraction:
     default: {items: [], privacy_request: {requested: false, covers_message_ids: []}}

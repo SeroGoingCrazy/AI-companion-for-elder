@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
 
@@ -14,6 +15,7 @@ from elder_companion.models import (
     DEFAULT_ELDER_ID,
     Alert,
     ChatSession,
+    DailyDigest,
     Elder,
     FamilyMember,
     MemoryItem,
@@ -310,6 +312,7 @@ def seed_history(session: Session, now: datetime, elder_id: int = DEFAULT_ELDER_
             for m in turn.memory:
                 _remember(session, memory, m, user, now.date() - timedelta(days=day.days_ago))
     _seed_adherence(session, elder_id, now.date())
+    _seed_digests(session, elder_id, now.date())
     elder = session.get_one(Elder, elder_id)
     # She has chatted for days: the privacy rule was explained in the first session.
     elder.privacy_disclosed_at = elder.privacy_disclosed_at or _utc(now, 6, HISTORY[0].turns[0].at)
@@ -326,6 +329,64 @@ ADHERENCE = {
     2: "declined",
     1: "confirmed",
 }
+
+
+# One digest per history day, so the weekly report opens with a real mood line and topic
+# counts instead of seven model calls. `days_ago: (mood 1-5, summary, topics)`.
+DIGESTS: dict[int, tuple[int, str, tuple[str, ...]]] = {
+    6: (
+        4,
+        "Maggie was cheerful and spent the afternoon planting roses. Her knee ached a "
+        "little in the cold morning, but it did not slow her down.",
+        ("garden", "knee"),
+    ),
+    5: (
+        2,
+        "Maggie slept badly and was tired all day. She was a bit flat, and planned a nap "
+        "after lunch.",
+        ("sleep",),
+    ),
+    4: (
+        2,
+        "A hard day: Maggie's knee was bad enough that walking to the kitchen was "
+        "difficult, and she sounded worn down. Leo's video call lifted her in the "
+        "evening.",
+        ("knee", "Leo"),
+    ),
+    3: (
+        3,
+        "Maggie slept a little better. She was quiet in the evening and said she felt "
+        "lonely when her daughter did not call.",
+        ("sleep", "loneliness"),
+    ),
+    2: (
+        5,
+        "A bright day. The knee was easier, the sun was out, and Maggie finished the whole "
+        "crossword in the afternoon.",
+        ("knee", "crossword", "garden"),
+    ),
+    1: (
+        4,
+        "Maggie slept well and picked tomatoes despite an aching knee. She was delighted "
+        "that Emily is visiting next weekend.",
+        ("knee", "garden", "Emily"),
+    ),
+}
+
+
+def _seed_digests(session: Session, elder_id: int, today: date) -> None:
+    for days_ago, (mood, summary, topics) in DIGESTS.items():
+        session.add(
+            DailyDigest(
+                elder_id=elder_id,
+                date=today - timedelta(days=days_ago),
+                summary=summary,
+                mood_score=mood,
+                topics_json=json.dumps(list(topics)),
+                has_private=False,
+                fingerprint="seed",  # never matches a real fingerprint, so a real day rebuilds
+            )
+        )
 
 
 def _seed_adherence(session: Session, elder_id: int, today: date) -> None:
