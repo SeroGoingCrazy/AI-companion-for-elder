@@ -444,3 +444,8 @@ body.family {
   .level-badge { border: 1px solid #000; color: #000; background: none !important; }
   @page { size: letter; margin: 0.6in; }
 }
+
+.memoir { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 22px; }
+.memoir-entry { break-inside: avoid; padding-left: 16px; border-left: 3px solid var(--sun); }
+.memoir-quote { margin: 4px 0 8px; font-size: 20px; line-height: 1.45; overflow-wrap: anywhere; }
+.memoir-retelling { margin: 0; color: var(--muted); font-style: italic; max-width: 60ch; }

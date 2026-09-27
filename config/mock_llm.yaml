@@ -14,6 +14,8 @@ chat:
   default_zh: "嗯嗯，我在听呢。能再多跟我说说吗？"
   # Matched against the system prompt, before `rules`.
   system_rules:
+    - match: ["keepsake memoir"]
+      reply: "This is one of the stories I love to tell, and I'm glad my family will keep it."
     - match: ["daily update for the family"]
       reply: "Maggie was in good spirits and chatted about her garden. She mentioned feeling dizzy in the mornings and, later, chest tightness with trouble breathing, which raised an emergency alert. Please check in with her today."
   rules:

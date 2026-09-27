@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ elder.nickname }}'s stories</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;700;800&display=swap">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="family report">
+  <main class="report-page">
+    <nav class="report-nav no-print">
+      <a href="/family">← Back to the dashboard</a>
+      <button type="button" class="btn btn-attention" onclick="window.print()">Print / Save as PDF</button>
+    </nav>
+
+    <header class="report-head">
+      <h1>{{ elder.nickname }}'s stories</h1>
+      <p class="meta">Stories {{ elder.nickname }} told her companion, in her own words. Each retelling is written by AI from her words alone; her words always come first.</p>
+    </header>
+
+    {% if entries %}
+    <ol class="memoir">
+      {% for e in entries %}
+      <li class="memoir-entry">
+        <p class="meta">Told {{ fmt_date(e.told_at) }}</p>
+        <blockquote class="memoir-quote" lang="{{ e.lang }}">“{{ e.excerpt }}”</blockquote>
+        {% if e.retelling %}<p class="memoir-retelling">{{ e.retelling }}</p>{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <p class="empty">No stories yet. When {{ elder.nickname }} shares a memory, it will appear here.</p>
+    {% endif %}
+  </main>
+</body>
+</html>

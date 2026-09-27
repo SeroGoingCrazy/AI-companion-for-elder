@@ -8,6 +8,7 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse
 
 from elder_companion.reports.doctor import build_doctor_report
+from elder_companion.reports.memoir import build_memoir
 from elder_companion.web.deps import SessionDep
 from elder_companion.web.routes.family import elder_now, elder_or_404
 from elder_companion.web.routes.pages import templates
@@ -43,4 +44,15 @@ def doctor_page(
         request,
         "doctor.html",
         {"r": report, "fmt_date": fmt_date, "fmt_when": fmt_when},
+    )
+
+
+@router.get("/family/memoir", response_class=HTMLResponse)
+def memoir_page(request: Request, session: SessionDep, elder_id: int | None = None) -> HTMLResponse:
+    elder = elder_or_404(session, elder_id)
+    entries = build_memoir(session, request.app.state.llm, elder, elder_now(request))
+    return templates.TemplateResponse(
+        request,
+        "memoir.html",
+        {"elder": elder, "entries": entries, "fmt_date": fmt_date},
     )
