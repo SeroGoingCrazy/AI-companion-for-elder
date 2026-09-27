@@ -68,6 +68,14 @@ def test_family_page_has_stage_h_panels_and_report_links(client: TestClient) -> 
     assert '"memberId": null' in html
 
 
+def test_family_page_has_the_reminders_panel(client: TestClient) -> None:
+    html = client.get("/family").text
+    for element_id in ("reminder-list", "reminders-empty", "reminder-form", "reminder-text"):
+        assert f'id="{element_id}"' in html
+    # The safety promise the team signed off on is on the page, not only in the prompt.
+    assert "never adds a dose or medical advice" in html
+
+
 @pytest.mark.parametrize(("member", "expected"), [("ben", 2), ("Ben", 2), ("1", 1), ("zoe", None)])
 def test_member_query_picks_by_name_or_id(
     client: TestClient, member: str, expected: int | None

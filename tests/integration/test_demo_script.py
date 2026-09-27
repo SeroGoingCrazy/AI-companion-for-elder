@@ -35,9 +35,18 @@ def test_demo_script_replays_offline(demo: TestClient) -> None:
     assert c.get("/elder").status_code == 200 and c.get("/family").status_code == 200
     assert c.get("/api/summary/today").json()["empty"] is True
 
-    # 1. Start chatting: the greeting asks how the orchid repotting went (seeded follow-up)
+    # 1. Start chatting: Amy's pill reminder outranks the seeded orchid follow-up (spec 3.8),
+    #    so the greeting raises it, in Amy's words.
     greet = c.post("/api/chat/greet").json()
-    assert "orchid" in greet["reply_text"] and not greet["fallback"]
+    assert "blood pressure pill" in greet["reply_text"] and not greet["fallback"]
+    assert "Amy" in greet["reply_text"]
+    assert c.get("/api/reminders").json()[0]["today_status"] == "mentioned"
+
+    # 1b. She says she took it: the dashboard shows today confirmed (H5 acceptance)
+    r = c.post("/api/chat", json={"text": "Yes, I took it with breakfast"}).json()
+    assert not r["fallback"]
+    pill = c.get("/api/reminders").json()[0]
+    assert pill["today_status"] == "confirmed" and pill["confirmed_days"] == 5
 
     # 2. Knee better, poor sleep (spoken: the mock transcribes b"MOCK:<text>")
     line = "Much better today, but I didn't sleep well last night."
