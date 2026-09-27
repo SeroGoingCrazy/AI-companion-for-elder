@@ -87,6 +87,7 @@ class MessageOut(BaseModel):
     role: str
     text: str  # "" when private; personal details scrubbed otherwise
     private: bool = False
+    awaiting_consent: bool = False  # private until she says it may be shared
     created_at: UtcDateTime
 
 

@@ -22,6 +22,7 @@ from elder_companion.chat.context import (
     part_of_day,
 )
 from elder_companion.chat.postprocess import guard_medical_advice, tidy_reply
+from elder_companion.consent import sharing_choices
 from elder_companion.db import utcnow
 from elder_companion.elders import get_elder
 from elder_companion.llm import BaseLLMClient, LLMError
@@ -99,6 +100,7 @@ class ChatService:
             history_turns=self._s.history_turns,
             memory=self._memory(elder),
             family_name=self._family_name(elder),
+            sharing=sharing_choices(self._session, elder.id),
         )
         try:
             reply = tidy_reply(self._llm.chat(messages, max_tokens=self._s.max_reply_tokens))
@@ -147,6 +149,7 @@ class ChatService:
             agenda=agenda,
             disclose_privacy=disclose,
             family_name=self._family_name(elder),
+            sharing=sharing_choices(self._session, elder.id),
         )
         try:
             reply = tidy_reply(self._llm.chat(messages, max_tokens=self._s.max_reply_tokens))

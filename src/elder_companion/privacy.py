@@ -19,12 +19,22 @@ from datetime import datetime
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from elder_companion.models import Alert, MemoryItem, Message, SymptomLog, SymptomMention
+from elder_companion.models import (
+    Alert,
+    MemoryItem,
+    Message,
+    ShareConsent,
+    SymptomLog,
+    SymptomMention,
+)
 from elder_companion.redaction import family_text
 from elder_companion.symptoms.merge import max_severity
 from elder_companion.symptoms.schema import SymptomCatalog, get_catalog
 
-PRIVATE_DAY_NOTE = "{nickname} asked to keep part of today's conversation private."
+PRIVATE_DAY_NOTE = (
+    "Part of today's conversation is not shared: {nickname} chose to keep it private "
+    "or has not said yet whether to share it."
+)
 DEFAULT_BYPASS_LEVELS: tuple[str, ...] = ("high",)
 
 
@@ -66,6 +76,8 @@ def mark_private(session: Session, message_ids: Collection[int]) -> int:
         .where(Message.id.in_(message_ids), Message.private.is_(False))
         .values(private=True)
     )
+    # Private for good: a later "yes, tell them" about the same subject must not release it.
+    session.execute(update(Message).where(Message.id.in_(message_ids)).values(consent_keys=None))
     # An item stays visible if any mention was visible; with a single mention it follows it.
     session.execute(
         update(MemoryItem)
@@ -96,6 +108,7 @@ class MessageView:
     text: str  # "" when private; personal details scrubbed otherwise
     private: bool
     created_at: datetime
+    awaiting_consent: bool = False  # private only until she agrees to share (consent.py)
 
 
 def history_page(
@@ -107,8 +120,24 @@ def history_page(
     if before_id is not None:
         stmt = stmt.where(Message.id < before_id)
     rows = reversed(session.scalars(stmt.order_by(Message.id.desc()).limit(limit)).all())
+    # Held back and not declined: at least one subject still waits for her answer.
+    pending = set(
+        session.scalars(
+            select(ShareConsent.key).where(
+                ShareConsent.elder_id == elder_id, ShareConsent.decision == "pending"
+            )
+        )
+    )
     return [
-        MessageView(m.id, m.role, "" if m.private else family_text(m), m.private, m.created_at)
+        MessageView(
+            m.id,
+            m.role,
+            "" if m.private else family_text(m),
+            m.private,
+            m.created_at,
+            awaiting_consent=m.private
+            and any(k in pending for k in (m.consent_keys or "").split("|")),
+        )
         for m in rows
     ]
 

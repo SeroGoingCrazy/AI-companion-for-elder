@@ -96,6 +96,8 @@ class AgendaSettings(_Model):
 class PrivacySettings(_Model):
     max_span_user_messages: int = 3  # preceding user messages a privacy request can cover
     bypass_levels: tuple[str, ...] = ("high",)  # alert levels that ignore privacy (ADR 19)
+    # Hold symptoms and personal matters back from the family until she agrees (ADR 23).
+    ask_before_sharing: bool = True
 
 
 class FallMCPSettings(_Model):

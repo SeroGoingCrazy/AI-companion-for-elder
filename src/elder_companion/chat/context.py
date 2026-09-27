@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 
 from elder_companion.agenda.select import AgendaItem
 from elder_companion.llm import ChatMessage
-from elder_companion.models import Elder, MemoryItem, Message, SymptomLog
+from elder_companion.models import Elder, MemoryItem, Message, ShareConsent, SymptomLog
 from elder_companion.prompts import render_prompt
 
 _CJK = re.compile(r"[一-鿿]")
@@ -18,6 +18,14 @@ NO_MEMORY = "(nothing yet)"
 DEFAULT_FAMILY_NAME = "her family"
 MEMORY_KIND_LABELS = {"follow_up": "plan", "person": "person", "topic": "topic", "story": "story"}
 PRIVATE_TAG = "[private: she asked you to keep this between you; never suggest telling her family]"
+NO_SHARING = "(nothing decided yet)"
+SHARING_LINES = {
+    "share": "- {label}: she is happy for {family} to know; don't ask again",
+    "private": (
+        "- {label}: she wants this kept between you; never ask again or offer to tell anyone"
+    ),
+    "pending": "- {label}: you asked whether to tell {family} and she hasn't answered yet",
+}
 
 
 def detect_language(text: str) -> str:
@@ -82,6 +90,15 @@ def format_memory(item: MemoryItem) -> str:
     return line
 
 
+def format_sharing(choices: Sequence[ShareConsent], family_name: str) -> str:
+    return (
+        "\n".join(
+            SHARING_LINES[c.decision].format(label=c.label, family=family_name) for c in choices
+        )
+        or NO_SHARING
+    )
+
+
 def follow_up_candidates(symptoms: Sequence[SymptomLog]) -> list[SymptomLog]:
     return [s for s in symptoms if s.status != "resolved"]
 
@@ -94,6 +111,7 @@ def system_prompt(
     companion_name: str,
     memory: Sequence[MemoryItem] = (),
     family_name: str = DEFAULT_FAMILY_NAME,
+    sharing: Sequence[ShareConsent] = (),
 ) -> str:
     follow_ups = [format_follow_up(s, now) for s in follow_up_candidates(symptoms)]
     return render_prompt(
@@ -107,6 +125,7 @@ def system_prompt(
         follow_ups="\n".join(follow_ups) or NO_FOLLOW_UPS,
         memory="\n".join(format_memory(m) for m in memory) or NO_MEMORY,
         family_name=family_name,
+        sharing=format_sharing(sharing, family_name),
     )
 
 
@@ -126,6 +145,7 @@ def build_context(
     history_turns: int,
     memory: Sequence[MemoryItem] = (),
     family_name: str = DEFAULT_FAMILY_NAME,
+    sharing: Sequence[ShareConsent] = (),
 ) -> list[ChatMessage]:
     """System prompt + recent history. `history` must already include the current user message."""
     system = system_prompt(
@@ -135,6 +155,7 @@ def build_context(
         companion_name=companion_name,
         memory=memory,
         family_name=family_name,
+        sharing=sharing,
     )
     return [{"role": "system", "content": system}, *history_messages(history, history_turns)]
 
@@ -172,6 +193,7 @@ def build_greet_context(
     agenda: Sequence[AgendaItem] = (),
     disclose_privacy: bool = False,
     family_name: str = DEFAULT_FAMILY_NAME,
+    sharing: Sequence[ShareConsent] = (),
 ) -> list[ChatMessage]:
     """Same context, ending with a system instruction to open the conversation. The session
     agenda (spec 3.8) takes the greeting's one question; otherwise it follows up on a
@@ -185,6 +207,7 @@ def build_greet_context(
         history_turns=history_turns,
         memory=memory,
         family_name=family_name,
+        sharing=sharing,
     )
     candidates = follow_up_candidates(symptoms)
     if agenda:
@@ -195,9 +218,9 @@ def build_greet_context(
         hint = "Ask how she is feeling today."
     disclosure = (
         "\n\nThis is your first chat together. Right after the greeting, tell her in one "
-        "short, warm sentence that she can always ask you to keep something just between the "
-        "two of you, and that the only exception is her safety, like a fall or chest pain, "
-        f"which you would always tell {family_name} about."
+        "short, warm sentence that you will always ask her before telling "
+        f"{family_name} anything personal, and that the only exception is her safety, like a "
+        "fall or chest pain, which you would always tell them about."
         if disclose_privacy
         else ""
     )

@@ -44,7 +44,7 @@ AlertBusDep = Annotated[AlertBus, Depends(get_alert_bus)]
 
 def get_symptom_pipeline(request: Request) -> Callable[..., object]:
     """`pipeline(user_message_id, reply_id)`: run as a BackgroundTask after a chat turn
-    (symptoms, companion memory, then family redaction)."""
+    (symptoms, ask-before-sharing consent, companion memory, then family redaction)."""
     state = request.app.state
     return partial(
         process_elder_message,
@@ -54,6 +54,7 @@ def get_symptom_pipeline(request: Request) -> Callable[..., object]:
         state.settings,
         state.alert_bus,
         state.redactor,
+        state.consent_extractor,
     )
 
 

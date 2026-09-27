@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from elder_companion import __version__
 from elder_companion.alerts.bus import AlertBus
+from elder_companion.consent import ConsentExtractor
 from elder_companion.db import init_db, make_engine, make_sessionmaker
 from elder_companion.llm import BaseLLMClient, get_llm
 from elder_companion.memory.extractor import MemoryExtractor
@@ -40,6 +41,7 @@ def create_app(settings: Settings | None = None, llm: BaseLLMClient | None = Non
     app.state.symptom_extractor = SymptomExtractor(app.state.llm)
     app.state.memory_extractor = MemoryExtractor(app.state.llm)
     app.state.redactor = Redactor(app.state.llm)
+    app.state.consent_extractor = ConsentExtractor(app.state.llm)
     app.state.alert_bus = AlertBus()
     app.state.daily_summary = DailySummary(
         app.state.llm,

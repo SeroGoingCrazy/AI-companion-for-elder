@@ -42,6 +42,7 @@ agenda:
 privacy:
   max_span_user_messages: 3          # preceding user messages a privacy request can cover
   bypass_levels: [high]              # alert levels that ignore privacy marks — do not change without an ADR
+  ask_before_sharing: ${ASK_BEFORE_SHARING:-true}   # symptoms / personal matters wait for her OK (red flags never wait)
 
 fall:
   model: ${FALL_MODEL:-models/yolo11n-pose.pt}   # fetched by scripts/fetch_demo_media.py

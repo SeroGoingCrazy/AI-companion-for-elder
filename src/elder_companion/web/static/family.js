@@ -258,7 +258,12 @@
     return el("li", { class: `history-msg ${m.role}${m.private ? " is-private" : ""}` },
       el("p", { class: "meta", text: `${who} · ${fmtWhen(m.created_at)}` }),
       m.private
-        ? el("p", { class: "history-text private-note", text: `Kept private at ${cfg.nickname}'s request` })
+        ? el("p", {
+          class: "history-text private-note",
+          text: m.awaiting_consent
+            ? `Not shared: ${cfg.nickname} hasn't said yet whether to share this`
+            : `Kept private at ${cfg.nickname}'s request`,
+        })
         : el("p", { class: "history-text", text: m.text }));
   }
 

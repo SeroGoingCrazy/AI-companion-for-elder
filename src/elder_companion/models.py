@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, String, Text, false
+from sqlalchemy import CheckConstraint, ForeignKey, Index, String, Text, UniqueConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column
 
 from elder_companion.db import Base, utcnow
@@ -67,6 +67,9 @@ class Message(Base):
     # The text with personal details scrubbed, for family views (redaction.py). NULL until
     # the background pass has run; readers then fall back to rule-based redaction.
     family_text: Mapped[str | None] = mapped_column(Text)
+    # Held back until she agrees to share: the share_consent keys ("|"-joined) this message
+    # waits on. Set together with private=True; cleared when she asks to keep it private.
+    consent_keys: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
 
@@ -178,3 +181,29 @@ class Claim(Base):
     note: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     done_at: Mapped[datetime | None] = mapped_column()
+
+
+CONSENT_DECISIONS = ("pending", "share", "private")
+
+
+class ShareConsent(Base):
+    """Her choice about sharing one subject with the family (consent.py): a symptom type
+    ("symptom:joint_pain") or a personal topic ("topic:money worries"). Asked once, then
+    remembered until she changes her mind."""
+
+    __tablename__ = "share_consent"
+    __table_args__ = (
+        UniqueConstraint("elder_id", "key", name="uq_share_consent_key"),
+        CheckConstraint(
+            "decision IN ('pending', 'share', 'private')", name="ck_share_consent_decision"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    elder_id: Mapped[int] = mapped_column(ForeignKey("elder.id"))
+    key: Mapped[str] = mapped_column(String(120))
+    label: Mapped[str] = mapped_column(String(120))  # "joint pain", "money worries"
+    decision: Mapped[str] = mapped_column(String(10), default="pending")
+    asked_message_id: Mapped[int | None] = mapped_column(ForeignKey("message.id"))
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=utcnow)

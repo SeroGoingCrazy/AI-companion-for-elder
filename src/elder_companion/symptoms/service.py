@@ -159,8 +159,10 @@ def run_symptom_pipeline(
     settings: SymptomSettings,
     bus: AlertBus | None,
     message_id: int,
+    publish_now: Callable[[AlertOut], bool] | None = None,
 ) -> tuple[list[AlertOut], int]:
-    """Extract, merge and alert; publish each new alert right away. Never raises.
+    """Extract, merge and alert; publish each new alert right away (only those `publish_now`
+    accepts, when given: the caller publishes the rest). Never raises.
     Returns (alerts, number of symptom rows touched)."""
     outs: list[AlertOut] = []
     symptoms = 0
@@ -175,7 +177,8 @@ def run_symptom_pipeline(
         logger.exception("symptom pipeline crashed for message %s", message_id)
     if bus is not None:
         for out in outs:
-            bus.publish(StreamEvent.alert(out))
+            if publish_now is None or publish_now(out):
+                bus.publish(StreamEvent.alert(out))
     return outs, symptoms
 
 
