@@ -57,6 +57,7 @@
       <p id="summary-text" class="summary-text">Loading…</p>
       <p id="summary-meta" class="meta"></p>
       <nav class="report-links" aria-label="Reports">
+        <a class="btn btn-quiet" href="/family/report/weekly">Weekly report</a>
         <a class="btn btn-quiet" href="/family/doctor">Doctor one-pager</a>
         <a class="btn btn-quiet" href="/family/memoir">{{ elder.nickname }}'s stories</a>
       </nav>
@@ -77,6 +78,35 @@
       <p class="meta care-intro">People and things she keeps bringing up.</p>
       <ul id="care-list" class="care-list"></ul>
       <p id="care-empty" class="empty" hidden>Nothing yet. People and topics she mentions more than once show up here.</p>
+    </section>
+
+    <section class="card reminders-card" aria-labelledby="reminders-h">
+      <div class="card-head">
+        <h2 id="reminders-h">Reminders</h2>
+        <span class="meta">Last 7 days</span>
+      </div>
+      <p class="meta reminders-intro">{{ companion_name }} brings these up in {{ elder.nickname }}'s next chat, in your words.</p>
+      <ul id="reminder-list" class="reminder-list"></ul>
+      <p id="reminders-empty" class="empty" hidden>No reminders yet. Add one below.</p>
+
+      <form id="reminder-form" class="reminder-form" autocomplete="off">
+        <label class="visually-hidden" for="reminder-text">What should {{ companion_name }} check on?</label>
+        <input id="reminder-text" type="text" maxlength="200" required
+               placeholder="e.g. blood pressure pill with breakfast">
+        <div class="reminder-when">
+          <label class="reminder-radio">
+            <input type="radio" name="reminder-kind" value="daily" checked> Every day at
+            <input id="reminder-time" type="time" value="08:00" aria-label="Time of day">
+          </label>
+          <label class="reminder-radio">
+            <input type="radio" name="reminder-kind" value="once"> Once on
+            <input id="reminder-date" type="date" aria-label="Date" disabled>
+          </label>
+        </div>
+        <p id="reminder-error" class="reminder-error" role="alert" hidden></p>
+        <button type="submit" class="btn btn-attention">Add reminder</button>
+      </form>
+      <p class="meta reminders-note">{{ companion_name }} repeats your wording and never adds a dose or medical advice.</p>
     </section>
 
     <section class="card fall-card" aria-labelledby="fall-h">

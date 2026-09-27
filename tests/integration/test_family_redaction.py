@@ -36,14 +36,28 @@ def test_greeting_is_redacted_in_the_background(client: TestClient) -> None:
         assert s.get(Message, r["message_id"]).family_text is not None
 
 
+def _digest_prompts(llm) -> list[str]:  # noqa: ANN001
+    """Since H7 the day is summarized by a structured `daily_digest` call, not a chat."""
+    return [
+        c["messages"][-1]["content"]
+        for name, c in llm.calls
+        if name == "extract_json" and c["name"] == "daily_digest"
+    ]
+
+
 def test_summary_never_sees_personal_details(client: TestClient) -> None:
     client.post("/api/chat", json={"text": SECRET_TURN})
     client.get("/api/summary/today?refresh=true")
-    llm = client.app.state.llm
-    summary_prompts = [
-        m[-1]["content"]
-        for name, m in llm.calls
-        if name == "chat" and "daily update" in m[0]["content"]
-    ]
-    assert summary_prompts
-    assert not [p for p in summary_prompts if any(s in p for s in SECRETS)]
+    prompts = _digest_prompts(client.app.state.llm)
+    assert prompts
+    assert not [p for p in prompts if any(s in p for s in SECRETS)]
+
+
+def test_weekly_report_never_sees_personal_details(client: TestClient) -> None:
+    """The weekly page builds today's digest too, so it goes through the same scrubbing."""
+    client.post("/api/chat", json={"text": SECRET_TURN})
+    assert client.get("/family/report/weekly").status_code == 200
+    prompts = _digest_prompts(client.app.state.llm)
+    assert prompts
+    assert not [p for p in prompts if any(s in p for s in SECRETS)]
+    assert not [s for s in SECRETS if s in client.get("/family/report/weekly").text]

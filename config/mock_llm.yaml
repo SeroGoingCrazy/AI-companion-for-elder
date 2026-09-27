@@ -8,16 +8,19 @@ chat:
   greet_rules:
     - match: ["first chat together"]
       reply: "Good morning, Maggie! I'm Sunny. You can always ask me to keep something just between us, except your safety, like a fall or chest pain, which I'd always tell Amy about. How are you feeling today?"
+    # Reminders outrank follow-ups in the agenda, so this rule comes before the orchid one.
+    - match: ["asked you to check on this"]
+      reply: "Good morning, Maggie! Amy asked me to check in about your blood pressure pill with breakfast. Have you had it yet?"
     - match: ["orchid"]
       reply: "Good morning, Maggie! How did repotting your orchid go?"
   default: "That's lovely to hear, Maggie. Tell me a little more?"
   default_zh: "嗯嗯，我在听呢。能再多跟我说说吗？"
   # Matched against the system prompt, before `rules`.
   system_rules:
+    - match: ["opening paragraph of a weekly report"]
+      reply: "Maggie had a mixed week: a rough patch mid-week with a bad knee day and two nights of poor sleep, then a real lift over the weekend. Her knee came up on four of the seven days and is the thing most worth watching. She took her blood pressure pill on most of the days it was raised."
     - match: ["keepsake memoir"]
       reply: "This is one of the stories I love to tell, and I'm glad my family will keep it."
-    - match: ["daily update for the family"]
-      reply: "Maggie was in good spirits and chatted about her garden. She mentioned feeling dizzy in the mornings and, later, chest tightness with trouble breathing, which raised an emergency alert. Please check in with her today."
   rules:
     - match: ["between us", "别告诉"]
       reply: "Of course, this stays between us. Just so you know, if it's ever about your safety, like a fall or chest pain, I'll always let Amy know."
@@ -31,6 +34,10 @@ chat:
       reply: "Oh no, a rough night is no fun. Was something on your mind, or were you just restless?"
     - match: ["knee", "膝盖"]
       reply: "I'm glad the knee is doing better. Will you get out to the garden today?"
+    - match: ["took it", "already took", "吃过了", "吃了"]
+      reply: "That's good to hear, Maggie. What's the plan for the rest of your morning?"
+    - match: ["not yet", "还没"]
+      reply: "No rush at all. Shall I check in with you again a bit later?"
     - match: ["lonely", "alone", "孤单", "一个人"]
       reply: "I'm right here with you, Maggie. Would you like to tell me about your day, or maybe give Leo a call later?"
 
@@ -96,6 +103,24 @@ json:
                duration: null, onset: null, status: ongoing, raw_quote: knee}
             - {canonical: joint_pain, label: 膝盖疼, body_part: knee, severity: unknown,
                duration: null, onset: null, status: ongoing, raw_quote: 膝盖}
+  # daily_digest: rules match the last paragraph of the notes, which is the alerts block.
+  daily_digest:
+    default:
+      summary: "Maggie chatted for a little while and seemed like her usual self."
+      mood_score: 3
+      topics: [chat]
+    rules:
+      - match: ["Chest pain", "Shortness of breath"]
+        result:
+          summary: "Maggie was in good spirits and chatted about her garden. She mentioned feeling dizzy in the mornings and, later, chest tightness with trouble breathing, which raised an emergency alert. Please check in with her today."
+          mood_score: 2
+          topics: [garden, sleep, dizziness]
+      - match: ["Fall detected"]
+        result:
+          summary: "A fall was detected at home today. Maggie chatted as usual otherwise."
+          mood_score: 2
+          topics: [fall]
+
   # memory_extraction: "$current_message_id" is replaced with the id of the utterance.
   memory_extraction:
     default: {items: [], privacy_request: {requested: false, covers_message_ids: []}}
@@ -122,6 +147,18 @@ json:
             - {kind: person, subject: Rosa, text: her neighbor Rosa, due_in_days: null,
                raw_quote: Rosa}
           privacy_request: {requested: false, covers_message_ids: []}
+      # Reminder answers. "$open_reminder_id" becomes the id of the reminder raised today;
+      # with no reminder open the ack is dropped, so these rules are safe to match broadly.
+      - match: ["took it", "already took", "吃过了", "吃了"]
+        result:
+          items: []
+          privacy_request: {requested: false, covers_message_ids: []}
+          reminder_acks: [{reminder_id: $open_reminder_id, status: confirmed}]
+      - match: ["not yet", "还没"]
+        result:
+          items: []
+          privacy_request: {requested: false, covers_message_ids: []}
+          reminder_acks: [{reminder_id: $open_reminder_id, status: declined}]
 
 transcribe:
   default: "Good morning! I'm doing okay today."

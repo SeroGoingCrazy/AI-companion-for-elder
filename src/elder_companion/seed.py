@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
 
@@ -14,10 +15,13 @@ from elder_companion.models import (
     DEFAULT_ELDER_ID,
     Alert,
     ChatSession,
+    DailyDigest,
     Elder,
     FamilyMember,
     MemoryItem,
     Message,
+    Reminder,
+    ReminderLog,
     SymptomLog,
     SymptomMention,
 )
@@ -45,9 +49,12 @@ DEMO_ELDER = {
 # and the name the companion uses in its privacy disclosure.
 DEMO_FAMILY = (("Amy", "daughter"), ("Ben", "son"))
 
+# Amy's standing reminder. Her wording is the only wording the companion uses (spec 2.6).
+DEMO_REMINDER = {"text": "blood pressure pill with breakfast", "schedule_time": "08:00"}
+
 
 def seed_demo(session: Session) -> Elder:
-    """Idempotent: create the demo elder and family members if missing."""
+    """Idempotent: create the demo elder, family members and Amy's reminder if missing."""
     elder = session.get(Elder, DEFAULT_ELDER_ID)
     if elder is None:
         elder = Elder(**DEMO_ELDER)
@@ -57,6 +64,18 @@ def seed_demo(session: Session) -> Elder:
         session.add_all(
             FamilyMember(elder_id=elder.id, name=name, relation=relation)
             for name, relation in DEMO_FAMILY
+        )
+        session.flush()
+    if session.scalar(select(Reminder.id).where(Reminder.elder_id == elder.id)) is None:
+        amy = session.scalars(
+            select(FamilyMember).where(FamilyMember.elder_id == elder.id).order_by(FamilyMember.id)
+        ).first()
+        session.add(
+            Reminder(
+                elder_id=elder.id,
+                from_member_id=amy.id if amy else None,
+                **DEMO_REMINDER,
+            )
         )
     session.commit()
     return elder
@@ -292,11 +311,98 @@ def seed_history(session: Session, now: datetime, elder_id: int = DEFAULT_ELDER_
                     )
             for m in turn.memory:
                 _remember(session, memory, m, user, now.date() - timedelta(days=day.days_ago))
+    _seed_adherence(session, elder_id, now.date())
+    _seed_digests(session, elder_id, now.date())
     elder = session.get_one(Elder, elder_id)
     # She has chatted for days: the privacy rule was explained in the first session.
     elder.privacy_disclosed_at = elder.privacy_disclosed_at or _utc(now, 6, HISTORY[0].turns[0].at)
     session.commit()
     return True
+
+
+# Six days of the pill reminder: mostly taken, one day she never got back to it, one "not yet".
+ADHERENCE = {
+    6: "confirmed",
+    5: "confirmed",
+    4: "no_response",
+    3: "confirmed",
+    2: "declined",
+    1: "confirmed",
+}
+
+
+# One digest per history day, so the weekly report opens with a real mood line and topic
+# counts instead of seven model calls. `days_ago: (mood 1-5, summary, topics)`.
+DIGESTS: dict[int, tuple[int, str, tuple[str, ...]]] = {
+    6: (
+        4,
+        "Maggie was cheerful and spent the afternoon planting roses. Her knee ached a "
+        "little in the cold morning, but it did not slow her down.",
+        ("garden", "knee"),
+    ),
+    5: (
+        2,
+        "Maggie slept badly and was tired all day. She was a bit flat, and planned a nap "
+        "after lunch.",
+        ("sleep",),
+    ),
+    4: (
+        2,
+        "A hard day: Maggie's knee was bad enough that walking to the kitchen was "
+        "difficult, and she sounded worn down. Leo's video call lifted her in the "
+        "evening.",
+        ("knee", "Leo"),
+    ),
+    3: (
+        3,
+        "Maggie slept a little better. She was quiet in the evening and said she felt "
+        "lonely when her daughter did not call.",
+        ("sleep", "loneliness"),
+    ),
+    2: (
+        5,
+        "A bright day. The knee was easier, the sun was out, and Maggie finished the whole "
+        "crossword in the afternoon.",
+        ("knee", "crossword", "garden"),
+    ),
+    1: (
+        4,
+        "Maggie slept well and picked tomatoes despite an aching knee. She was delighted "
+        "that Emily is visiting next weekend.",
+        ("knee", "garden", "Emily"),
+    ),
+}
+
+
+def _seed_digests(session: Session, elder_id: int, today: date) -> None:
+    for days_ago, (mood, summary, topics) in DIGESTS.items():
+        session.add(
+            DailyDigest(
+                elder_id=elder_id,
+                date=today - timedelta(days=days_ago),
+                summary=summary,
+                mood_score=mood,
+                topics_json=json.dumps(list(topics)),
+                has_private=False,
+                fingerprint="seed",  # never matches a real fingerprint, so a real day rebuilds
+            )
+        )
+
+
+def _seed_adherence(session: Session, elder_id: int, today: date) -> None:
+    reminder = session.scalars(
+        select(Reminder).where(Reminder.elder_id == elder_id).order_by(Reminder.id)
+    ).first()
+    if reminder is None:
+        return
+    for days_ago, status in ADHERENCE.items():
+        session.add(
+            ReminderLog(
+                reminder_id=reminder.id,
+                date=today - timedelta(days=days_ago),
+                status=status,
+            )
+        )
 
 
 def _remember(

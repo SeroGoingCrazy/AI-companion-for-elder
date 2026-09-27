@@ -133,7 +133,7 @@ class ChatService:
         self._session.add(chat)
         self._session.flush()
         history = self._history(elder)
-        agenda = self._agenda.select(elder.id, now.date())
+        agenda = self._agenda.select(elder.id, now)
         disclose = elder.privacy_disclosed_at is None
         messages = build_greet_context(
             elder,
@@ -158,7 +158,7 @@ class ChatService:
             fallback = True
         assistant_msg = self._save(elder, "assistant", reply, chat.id)
         if not fallback:
-            self._agenda.mark_carried(agenda)
+            self._agenda.mark_carried(agenda, now.date())
             if disclose:
                 elder.privacy_disclosed_at = utcnow()
         self._session.commit()

@@ -439,6 +439,122 @@
     }
   }
 
+  // ---------- reminders (set by the family, raised in her next chat) ----------
+
+  const DOSE_MARK = { confirmed: "\u2713", declined: "\u2013", no_response: "?" };
+  const DOSE_LABEL = {
+    confirmed: "said she did it",
+    declined: "said not yet",
+    no_response: "never answered",
+  };
+  const dayFmtShort = new Intl.DateTimeFormat(LOCALE, { timeZone: tz, weekday: "short" });
+
+  function whenLabel(r) {
+    if (r.schedule_time) return `Every day at ${r.schedule_time}`;
+    return `Once on ${dateFmt.format(new Date(`${r.schedule_date}T12:00:00`))}`;
+  }
+
+  function doseDot(d) {
+    const status = d.status || "none";
+    // Date-only string: parse at midday so the label can't slip a day in another zone.
+    const day = dayFmtShort.format(new Date(`${d.date}T12:00:00`));
+    const what = d.status ? DOSE_LABEL[d.status] : "not asked";
+    return el("li", {
+      class: `dose dose-${status}`,
+      title: `${day}: ${what}`,
+      text: DOSE_MARK[d.status] || "\u00b7",
+    }, el("span", { class: "visually-hidden", text: `${day}: ${what}` }));
+  }
+
+  function reminderItem(r) {
+    const off = !r.active;
+    return el("li", { class: `reminder-item${off ? " is-off" : ""}`, "data-id": r.id },
+      el("div", {},
+        el("p", { class: "reminder-text", text: r.text }),
+        el("p", { class: "reminder-when-label",
+          text: `${whenLabel(r)}${r.from_member_name ? ` · set by ${r.from_member_name}` : ""}${off ? " · off" : ""}` })),
+      off ? null : el("button", {
+        class: "btn btn-quiet btn-small", type: "button",
+        "aria-label": `Turn off the reminder: ${r.text}`,
+        text: "Turn off", onclick: () => turnOffReminder(r.id),
+      }),
+      el("ul", { class: "adherence", "aria-label": "Last 7 days" }, ...r.history.map(doseDot)),
+      el("span", { class: "adherence-summary",
+        text: r.raised_days ? `${r.confirmed_days}/${r.raised_days} days` : "not asked yet" }));
+  }
+
+  function renderReminders(list) {
+    const ul = $("reminder-list");
+    if (!ul) return;
+    ul.replaceChildren(...list.map(reminderItem));
+    $("reminders-empty").hidden = list.length > 0;
+  }
+
+  async function loadReminders() {
+    try {
+      renderReminders(await api("/api/reminders"));
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function turnOffReminder(id) {
+    try {
+      await api(`/api/reminders/${id}`, { method: "DELETE" });
+      await loadReminders();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  function initReminderForm() {
+    const form = $("reminder-form");
+    if (!form) return;
+    const time = $("reminder-time");
+    const dateInput = $("reminder-date");
+    const error = $("reminder-error");
+    const kind = () => form.querySelector('input[name="reminder-kind"]:checked').value;
+
+    const syncKind = () => {
+      const daily = kind() === "daily";
+      time.disabled = !daily;
+      dateInput.disabled = daily;
+      if (!daily && !dateInput.value) dateInput.value = dayFmt.format(new Date());
+    };
+    for (const radio of form.querySelectorAll('input[name="reminder-kind"]')) {
+      radio.addEventListener("change", syncKind);
+    }
+    syncKind();
+
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const text = $("reminder-text").value.trim();
+      if (!text) return;
+      const body = { text };
+      if (kind() === "daily") body.schedule_time = time.value;
+      else body.schedule_date = dateInput.value;
+      if (memberId != null) body.from_member_id = memberId;
+      error.hidden = true;
+      const submit = form.querySelector('button[type="submit"]');
+      submit.disabled = true;
+      try {
+        await api("/api/reminders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        $("reminder-text").value = "";
+        await loadReminders();
+      } catch (e) {
+        console.error(e);
+        error.textContent = "Couldn't save that reminder. Please check the time and try again.";
+        error.hidden = false;
+      } finally {
+        submit.disabled = false;
+      }
+    });
+  }
+
   // ---------- live updates ----------
 
   let activityTimer = null;
@@ -451,7 +567,7 @@
 
     source.addEventListener("open", () => {
       setLive("live", "Live");
-      if (dropped) { loadAlerts(); loadSymptoms(); loadHistory(); loadCareList(); loadClaims(); } // catch up
+      if (dropped) { loadAlerts(); loadSymptoms(); loadHistory(); loadCareList(); loadClaims(); loadReminders(); } // catch up
       dropped = false;
     });
     source.addEventListener("error", () => {
@@ -470,7 +586,7 @@
       clearTimeout(activityTimer);
       // After each turn: new symptoms / memory, and a privacy request may hide earlier items.
       activityTimer = setTimeout(() => {
-        loadSymptoms(); loadHistory(); loadCareList(); loadAlerts();
+        loadSymptoms(); loadHistory(); loadCareList(); loadAlerts(); loadReminders();
       }, ACTIVITY_DEBOUNCE_MS);
     });
   }
@@ -484,14 +600,16 @@
   $("history-older").addEventListener("click", loadOlderHistory);
 
   initMembers();
+  initReminderForm();
   loadSummary();
   loadAlerts();
   loadClaims();
   loadCareList();
+  loadReminders();
   loadSymptoms();
   loadHistory();
   connectFallStream();
   connectAlertStream();
 
-  window.__dashboard = { loadSummary, loadSymptoms, loadAlerts, showAlertBanner, get summaryStale() { return summaryStale; } };
+  window.__dashboard = { loadSummary, loadSymptoms, loadAlerts, loadReminders, showAlertBanner, get summaryStale() { return summaryStale; } };
 })();

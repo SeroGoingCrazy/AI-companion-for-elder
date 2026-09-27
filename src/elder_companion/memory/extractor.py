@@ -27,6 +27,14 @@ class Turn:
     text: str
 
 
+@dataclass(frozen=True)
+class OpenReminder:
+    """A reminder already raised today and still waiting for her answer (spec 3.8)."""
+
+    reminder_id: int
+    text: str
+
+
 def verify_quote(quote: str, text: str) -> bool:
     q = _normalize(quote)
     return bool(q) and q in _normalize(text)
@@ -41,17 +49,28 @@ def format_turns(turns: Sequence[Turn]) -> str:
     return "\n".join(lines) or "(none)"
 
 
+def format_open_reminders(reminders: Sequence[OpenReminder]) -> str:
+    lines = [f"[reminder_id={r.reminder_id}] {r.text}" for r in reminders]
+    return "\n".join(lines) or "(none)"
+
+
 class MemoryExtractor:
     def __init__(self, llm: BaseLLMClient) -> None:
         self._llm = llm
         self._schema = memory_schema()
 
     def messages(
-        self, message_id: int, user_text: str, recent_turns: Sequence[Turn]
+        self,
+        message_id: int,
+        user_text: str,
+        recent_turns: Sequence[Turn],
+        open_reminders: Sequence[OpenReminder] = (),
     ) -> list[ChatMessage]:
         # The utterance comes last, after a blank line (MockLLMClient matches only that part).
         user = (
             f"Recent conversation (context only):\n{format_turns(recent_turns)}\n\n"
+            "Reminders already raised today, still unanswered (context only):\n"
+            f"{format_open_reminders(open_reminders)}\n\n"
             f"Current utterance [#{message_id}]:\n{user_text}"
         )
         return [
@@ -60,12 +79,17 @@ class MemoryExtractor:
         ]
 
     def extract(
-        self, message_id: int, user_text: str, recent_turns: Sequence[Turn] = ()
+        self,
+        message_id: int,
+        user_text: str,
+        recent_turns: Sequence[Turn] = (),
+        open_reminders: Sequence[OpenReminder] = (),
     ) -> MemoryExtraction:
         """Raises LLMError if the call fails. Items whose quote is not in the utterance and
-        duplicates (same kind + subject) are dropped."""
+        duplicates (same kind + subject) are dropped, as are acks for a reminder that was
+        not raised (the model must not invent one she was never asked about)."""
         data = self._llm.extract_json(
-            self.messages(message_id, user_text, recent_turns),
+            self.messages(message_id, user_text, recent_turns, open_reminders),
             schema=self._schema,
             name=SCHEMA_NAME,
         )
@@ -81,4 +105,13 @@ class MemoryExtractor:
                 )
                 continue
             kept.setdefault((item.kind, normalize_subject(item.subject)), item)
-        return result.model_copy(update={"items": list(kept.values())})
+        offered = {r.reminder_id for r in open_reminders}
+        acks = {}
+        for ack in result.reminder_acks:
+            if ack.reminder_id not in offered:
+                logger.info("dropping ack for reminder %s: not raised today", ack.reminder_id)
+                continue
+            acks.setdefault(ack.reminder_id, ack)
+        return result.model_copy(
+            update={"items": list(kept.values()), "reminder_acks": list(acks.values())}
+        )

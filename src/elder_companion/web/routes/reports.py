@@ -7,6 +7,7 @@ from datetime import datetime
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse
 
+from elder_companion.reports.chart import mood_path, mood_points
 from elder_companion.reports.doctor import build_doctor_report
 from elder_companion.reports.memoir import build_memoir
 from elder_companion.web.deps import SessionDep
@@ -44,6 +45,32 @@ def doctor_page(
         request,
         "doctor.html",
         {"r": report, "fmt_date": fmt_date, "fmt_when": fmt_when},
+    )
+
+
+@router.get("/family/report/weekly", response_class=HTMLResponse)
+def weekly_report_page(
+    request: Request,
+    session: SessionDep,
+    week: int = Query(0, ge=0, le=52, description="0 = the last 7 days, 1 = the week before"),
+    elder_id: int | None = None,
+) -> HTMLResponse:
+    """One printable page: mood line, topics, symptom trends and reminder adherence."""
+    elder = elder_or_404(session, elder_id)
+    report = request.app.state.weekly_report.get(
+        session, elder, elder_now(request), weeks_back=week
+    )
+    return templates.TemplateResponse(
+        request,
+        "report_weekly.html",
+        {
+            "elder": elder,
+            "r": report,
+            "week": week,
+            "mood_path": mood_path,
+            "mood_points": mood_points,
+            "fmt_date": fmt_date,
+        },
     )
 
 
