@@ -804,11 +804,11 @@ fall:
 | E | E1 E2 E3 E4 E5* | ✅✅✅✅⬜ |
 | F | F1 F2 F3 F4 F5 F6 F7 F8 F9* | ✅✅✅✅✅✅✅✅⬜ |
 | H | H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 | ✅✅✅✅✅✅✅✅✅✅✅✅✅✅ |
-| G | G1 G2 G3 G4 | ✅⬜⬜⬜ |
+| G | G1 G2 G3 G4 G5 G6 G7 G8 | ✅⬜✅⬜✅✅✅✅ |
 
 ### 📈 Overall Progress
 
-`40 / 45` (* = optional task, not required for delivery)
+`45 / 50` (* = optional task, not required for delivery)
 
 ---
 
@@ -1220,19 +1220,51 @@ fall:
 - **Acceptance**: the full demo is ≤ 7 minutes and every step has a fallback.
 - **How to test**: rehearsal.
 
-### G3: One-command startup and README
-- **Owner**: A
-- **Goal**: `scripts/dev_up.ps1`: init DB + seed → start web → start fall_detector; the README clearly covers environment, `.env`, startup, and demo URLs.
-- **Files**: `scripts/dev_up.ps1`, `README.md`.
-- **Acceptance**: a fresh clone runs within 10 minutes by following the README.
-- **How to test**: run it from scratch on the teammate's machine.
-
 ### G4: End-to-end acceptance and rehearsal
 - **Owner**: A + B
 - **Goal**: run all of L1 + L2 (both evals); rehearse the demo script ≥ 3 times and record the 2.9 metrics; prepare the mock fallback (the full demo script replays under `LLM_PROVIDER=mock`).
 - **Files**: `DEV_SPEC.md` (final progress and metrics).
 - **Acceptance**: `uv run pytest -q` is all green (including the privacy leak test); the 2.9 table is filled in; every P0/P1 task in the progress table is ✅.
 - **How to test**: `uv run pytest -q && uv run python eval/run_extraction_eval.py && uv run python eval/run_memory_eval.py`.
+
+### G3: One-command startup and README ✅
+- **Owner**: A
+- **Goal**: one command brings the whole demo up; the README shows what it is before asking anyone to run anything.
+- **Files**: `scripts/demo_up.sh`, `README.md`, `docs/images/*`.
+- **Acceptance**: a fresh clone is running within two minutes, with no API key.
+- **How to test**: `./scripts/demo_up.sh` on a clean checkout.
+- **Note**: written as `demo_up.sh` rather than the planned `dev_up.ps1` — the team is on macOS. Defaults to `LLM_PROVIDER=mock`, starts fall-mcp only when its model is on disk, stops both services on Ctrl-C.
+
+### G5: Installable app (PWA) ✅
+- **Owner**: A
+- **Goal**: both surfaces install to a phone home screen with their own name, icon and start URL, and open full screen; precache the shell so the app still opens when venue wifi drops, while every live path stays on the network.
+- **Files**: `web/routes/pwa.py`, `web/static/sw.js`, `web/static/pwa.js`, `web/static/icons/*`, `scripts/make_icons.py`, both templates.
+- **Acceptance**: Chrome reports both pages installable; the worker claims scope `/`; no `/api/` or `/media/` response is ever cached; `/elder` still renders with the server stopped; the cache name is a digest of the static files, so an asset change invalidates it without anyone remembering to bump a version.
+- **How to test**: `uv run pytest tests/integration/test_pwa.py -q`; on a phone, open over HTTPS and Add to Home Screen.
+- **Note**: a LAN address is not a secure context, so phones need an HTTPS tunnel. `cloudflared tunnel --url http://127.0.0.1:8000`, or `ssh -R 80:localhost:8000 nokey@localhost.run` where Cloudflare is blocked.
+
+### G6: Reproducible demo screenshots ✅
+- **Owner**: A
+- **Goal**: replay the demo script against a running server and capture the pitch-deck shots, so they can be regenerated instead of retaken whenever the UI moves.
+- **Files**: `scripts/demo_shots.py`, `demo/shots/*.png`, `docs/images/*`.
+- **Acceptance**: one command produces the elder app at phone size and the dashboard at laptop size, including the urgent alert arriving live.
+- **How to test**: `uv run elder-web` then `uv run --with playwright python scripts/demo_shots.py`.
+
+### G7: One origin for the demo ✅
+- **Owner**: A
+- **Goal**: serve fall-mcp's MJPEG view through the main app, so the whole demo is reachable over a single HTTPS tunnel from a phone.
+- **Files**: `web/routes/fall_proxy.py`, `web/app.py`, `web/static/family.js`.
+- **Acceptance**: `/fall/stream` relays the multipart body with its content type; fall-mcp being down is a 503 the dashboard already treats as "offline".
+- **How to test**: `uv run pytest tests/integration/test_fall_proxy.py -q`.
+- **Why**: the dashboard pointed `<img>` at `host:8001`, which a phone cannot reach, and which an HTTPS page blocks as mixed content before the request is made.
+
+### G8: Bilingual interface and the tab bar ✅
+- **Owner**: A
+- **Goal**: English and Simplified Chinese throughout, switchable per browser; the dashboard restructured onto a bottom tab bar so it reads as an app on a phone rather than one long scroll.
+- **Files**: `elder_companion/i18n.py`, `config/i18n/{en,zh}.yaml`, `web/static/{tokens,elder,family}.css`, `web/static/{lang,tabs}.js`, both templates, `web/routes/pages.py`, `web/routes/alerts.py`.
+- **Acceptance**: every key exists in both files with matching placeholders (tested); alert titles follow the reader while the stored record stays English; privacy filtering runs before localization; nothing overflows a 390px viewport.
+- **How to test**: `uv run pytest tests/integration/test_i18n.py tests/integration/test_layout.py -q`.
+- **Note**: the companion's name is never hardcoded in the i18n files — every string uses a `{companion}` placeholder, so the Sunny→Hallo rename needed no translation changes. `style.css` is kept — the weekly report, doctor one-pager and memoir still use it. The elder and family surfaces moved to the new stylesheets, and the components added on dev (reminders, care list, member picker, claims) were restated in the new tokens.
 
 ### Demo Script (draft)
 

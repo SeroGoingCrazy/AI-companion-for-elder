@@ -15,7 +15,7 @@ MOOD_MIN, MOOD_MAX = 1, 5
 @dataclass(frozen=True)
 class ChartBox:
     width: float = 640
-    height: float = 180
+    height: float = 240  # tall enough that the day labels do not collide on a phone
     pad_x: float = 30
     pad_top: float = 14
     pad_bottom: float = 26

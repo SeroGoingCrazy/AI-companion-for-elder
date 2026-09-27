@@ -22,18 +22,25 @@
     voiceSwitch: $("voice-switch"),
   };
 
+  // Server-rendered strings for the chosen language (config/i18n/<lang>.yaml).
+  const S = (window.APP_CONFIG && window.APP_CONFIG.t) || {};
+  const COMPANION = (window.APP_CONFIG && window.APP_CONFIG.companionName) || "";
+  // Spoken aloud, so it follows the language she just used, not the interface language.
+  const SPOKEN = (window.APP_CONFIG && window.APP_CONFIG.spoken) || {};
   const TEXT = {
-    idle: "Hold the button and talk to me",
-    listening: "I'm listening…",
-    listeningTap: "I'm listening… tap the button again when you're done",
-    thinking: "Let me think…",
-    speaking: "Speaking… tap the button to talk",
-    tooShort: "That was very short. Hold the button down while you talk.",
-    silence: "I didn't hear anything. Hold the button and talk to me.",
-    retry: { en: "Sorry, I didn't quite catch that. Could you say it again?", zh: "不好意思，我没听清楚，能再说一遍吗？" },
-    micDenied: "Please allow the microphone so I can hear you. You can also type below.",
-    noMic: "This browser can't record audio. You can type below instead.",
-    error: "Sorry, something went wrong. Please try again.",
+    idle: S.idle,
+    listening: S.listening,
+    listeningTap: S.listening_tap,
+    thinking: S.thinking,
+    speaking: window.fmt(S.speaking, { companion: COMPANION }),
+    tooShort: S.too_short,
+    silence: S.silence,
+    micDenied: S.mic_denied,
+    noMic: S.no_recorder,
+    error: S.failed,
+    holdToTalk: S.hold_to_talk,
+    stopAndSend: S.stop_and_send,
+    pressAndSpeak: S.press_and_speak,
   };
   const TAP_MS = 350;          // shorter press = tap mode (tap again to stop)
   const MIN_RECORD_MS = 500;   // ignore accidental blips
@@ -93,7 +100,7 @@
     document.body.dataset.state = next;
     els.status.textContent = text || TEXT[next] || "";
     els.mic.setAttribute("aria-pressed", String(next === "listening"));
-    els.mic.setAttribute("aria-label", next === "listening" ? "Stop and send" : "Hold to talk");
+    els.mic.setAttribute("aria-label", next === "listening" ? TEXT.stopAndSend : TEXT.holdToTalk);
     els.mic.disabled = next === "thinking";
   }
 
@@ -356,7 +363,7 @@
       const data = await res.json();
       logTiming("voice turn (upload + transcribe + reply)", t0);
       if (data.need_retry) {
-        const msg = TEXT.retry[lastLang];
+        const msg = SPOKEN[lastLang] || SPOKEN.en || S.not_caught;
         setStatus("idle", msg);
         speakWithBrowser(msg);
         return;
@@ -458,7 +465,8 @@
     if (navigator.mediaDevices && window.MediaRecorder) ensureStream().catch(() => {});
     const t0 = performance.now();
     try {
-      const data = await postJSON("/api/chat/greet", cfg.elderId ? { elder_id: cfg.elderId } : {});
+      const data = await postJSON("/api/chat/greet",
+        { ...(cfg.elderId ? { elder_id: cfg.elderId } : {}), lang: cfg.lang });
       logTiming("greeting", t0);
       await showReply(data);
     } catch (err) {

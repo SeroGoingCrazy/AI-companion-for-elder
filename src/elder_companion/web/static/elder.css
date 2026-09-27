@@ -1,0 +1,208 @@
+/* The elder surface.
+ *
+ * One screen, one job: press the bar and talk. Everything else is subtraction, which is
+ * the real lesson from Chinese care modes — they strip functionality, they do not just
+ * enlarge it.
+ *
+ * The talk control is a full-width bar rather than a disc because that is the shape
+ * WeChat taught this audience; the gesture is already in their hands. It also gives a
+ * bigger target than a circle can at the bottom of a phone, where the thumb actually is.
+ */
+
+@import url("/static/tokens.css");
+
+* { box-sizing: border-box; }
+
+/* The scripts toggle screens with the `hidden` attribute. Any `display` rule below would
+ * otherwise out-specify the UA default and leave both screens stacked on top of each other. */
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--face-ui);
+  font-size: var(--t-elder-body);
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+  /* The app fills the screen and scrolls inside the conversation, never as a page. A page
+     scroll carried the header and the talk bar off the display as the chat grew, which is
+     the one control she is meant to be able to reach without thinking. */
+  overflow: hidden;
+  height: 100%;
+}
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+
+.elder-app {
+  height: 100dvh;
+  display: flex; flex-direction: column;
+  padding: max(18px, env(safe-area-inset-top)) var(--gutter)
+           max(14px, env(safe-area-inset-bottom));
+  max-width: 560px; margin-inline: auto;
+}
+
+/* ---------- header ---------- */
+
+.elder-header { display: flex; align-items: center; gap: 13px; flex: none; }
+
+.avatar { width: 42px; height: 42px; flex: none; }
+.avatar .disc { fill: var(--amber); }
+.avatar .ray { stroke: var(--amber); }
+
+.elder-header h1 {
+  font-family: var(--face-display); font-weight: 700; font-size: 28px;
+  margin: 0; letter-spacing: -0.015em; line-height: 1.15;
+}
+.subtitle { margin: 1px 0 0; color: var(--ink-2); font-size: 17px; }
+
+.lang-switch {
+  margin-left: auto; flex: none;
+  min-height: var(--tap); min-width: var(--tap);
+  padding: 0 16px; border: 2px solid var(--rule); border-radius: var(--r-chip);
+  background: var(--paper-lift); color: var(--ink-2);
+  font-family: var(--face-ui); font-size: 17px; font-weight: 700; cursor: pointer;
+}
+.lang-switch:active { background: var(--amber-wash); }
+
+/* ---------- start screen ---------- */
+
+.start { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 30px; }
+.start-greeting {
+  font-family: var(--face-display); font-weight: 700; font-size: 38px;
+  margin: 0; text-align: center; letter-spacing: -0.02em; line-height: 1.2;
+}
+.start-btn {
+  min-height: 74px; padding: 0 44px;
+  border: 0; border-radius: var(--r-control);
+  background: var(--amber); color: var(--ink);
+  font-family: var(--face-ui); font-size: 26px; font-weight: 700; cursor: pointer;
+  box-shadow: 0 5px 0 var(--amber-deep);
+}
+.start-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--amber-deep); }
+
+/* ---------- conversation ----------
+ * Class names come from elder.js (`bubble assistant` / `bubble user`); it keeps only the
+ * last few turns on screen, which is why there is no scrollback treatment here. */
+
+.chat { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+/* Everything below the conversation is fixed furniture: it must not be pushed off-screen. */
+.status, .mic, .mic-hint, .type-instead, .disclaimer { flex: none; }
+
+.conversation {
+  flex: 1; min-height: 0;
+  overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 12px;
+  padding: 22px 0 16px;
+}
+.bubble {
+  max-width: 88%; padding: 15px 19px;
+  font-size: var(--t-elder-say); line-height: 1.45;
+  animation: bubble-in 220ms ease-out;
+}
+.bubble.assistant {
+  align-self: flex-start; background: var(--paper-lift); border: 1px solid var(--rule);
+  border-radius: var(--r-card) var(--r-card) var(--r-card) 7px;
+  box-shadow: var(--lift-1);
+}
+.bubble.user {
+  align-self: flex-end; background: var(--ink); color: var(--paper-lift);
+  border-radius: var(--r-card) var(--r-card) 7px var(--r-card);
+}
+@keyframes bubble-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ---------- status line ---------- */
+
+.status {
+  flex: none; margin: 0 0 12px; min-height: 30px; text-align: center;
+  font-size: var(--t-elder-lead); font-weight: 700; color: var(--ink-2);
+}
+[data-state="listening"] .status { color: var(--alarm); }
+[data-state="thinking"]  .status { color: var(--ink-2); }
+[data-state="speaking"]  .status { color: var(--calm); }
+
+/* ---------- the talk bar ---------- */
+
+.mic {
+  flex: none; width: 100%; min-height: 84px;
+  display: flex; align-items: center; justify-content: center; gap: 13px;
+  border: 0; border-radius: var(--r-control);
+  background: var(--amber); color: var(--ink);
+  font-family: var(--face-ui); font-size: 26px; font-weight: 700;
+  cursor: pointer; user-select: none; -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent; touch-action: none;
+  box-shadow: 0 5px 0 var(--amber-deep);
+}
+.mic svg { width: 31px; height: 31px; flex: none; fill: currentColor; }
+.mic:active, [data-state="listening"] .mic { transform: translateY(3px); box-shadow: 0 2px 0 var(--amber-deep); }
+[data-state="listening"] .mic { background: var(--alarm); color: #fff; box-shadow: 0 2px 0 #7E2413; }
+[data-state="thinking"] .mic, [data-state="speaking"] .mic { background: var(--rule); color: var(--ink-2); box-shadow: 0 5px 0 #CFC3AE; }
+.mic:focus-visible { outline: 4px solid var(--ink); outline-offset: 3px; }
+
+.mic-hint { flex: none; margin: 11px 0 0; text-align: center; color: var(--ink-3); font-size: 17px; }
+
+/* ---------- type fallback ---------- */
+
+.type-instead { flex: none; margin-top: 12px; }
+.type-instead > summary {
+  list-style: none; cursor: pointer; text-align: center;
+  min-height: var(--tap); display: flex; align-items: center; justify-content: center;
+  color: var(--ink-2); font-size: 18px; text-decoration: underline; text-underline-offset: 4px;
+}
+.type-instead > summary::-webkit-details-marker { display: none; }
+.text-form { display: flex; gap: 9px; padding-top: 9px; }
+#text-input {
+  flex: 1; min-height: var(--tap); padding: 0 16px;
+  border: 2px solid var(--rule); border-radius: var(--r-control);
+  background: var(--paper-lift); color: var(--ink);
+  font-family: var(--face-ui); font-size: 20px;
+}
+#text-input:focus-visible { outline: 3px solid var(--ink); outline-offset: 1px; border-color: var(--ink); }
+.text-form button {
+  min-height: var(--tap); padding: 0 22px; border: 0; border-radius: var(--r-control);
+  background: var(--ink); color: var(--paper-lift);
+  font-family: var(--face-ui); font-size: 19px; font-weight: 700; cursor: pointer;
+}
+
+/* ---------- footer ---------- */
+
+.disclaimer {
+  flex: none; padding: 13px 4px 0; text-align: center;
+  color: var(--ink-3); font-size: 15px; line-height: 1.45;
+}
+
+/* Short phones: give the conversation the space, shrink the chrome, never the control. */
+@media (max-height: 700px) {
+  .conversation { padding-top: 14px; }
+  .elder-header h1 { font-size: 24px; }
+  .start-greeting { font-size: 31px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bubble { animation: none; }
+  .mic, .start-btn { transition: none; }
+}
+
+/* ---------- voice switch (H12, from dev) ----------
+   Restated in this file's tokens; the control and its behaviour are unchanged. */
+.voice-switch { margin-left: auto; display: inline-flex; gap: 6px; flex: none; }
+.voice-switch button {
+  min-height: var(--tap); padding: 0 14px;
+  border: 2px solid var(--rule); border-radius: var(--r-chip);
+  background: var(--paper-lift); color: var(--ink-2);
+  font-family: var(--face-ui); font-size: 16px; font-weight: 700; cursor: pointer;
+}
+.voice-switch button[aria-pressed="true"] {
+  background: var(--amber-wash); border-color: var(--amber); color: var(--ink);
+}
+.elder-header .lang-switch { margin-left: 0; }
+
+@media (max-width: 430px) {
+  /* The header runs out of room once the voice switch is in it. */
+  .elder-header { flex-wrap: wrap; }
+  .voice-switch { margin-left: 0; }
+  .voice-switch button, .elder-header .lang-switch { font-size: 15px; padding: 0 12px; }
+}

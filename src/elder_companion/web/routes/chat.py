@@ -67,6 +67,8 @@ class GreetIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     elder_id: int | None = None
+    # Her app's language, used only when there is no history to infer one from.
+    lang: str | None = None
 
 
 class ChatOut(BaseModel):
@@ -137,7 +139,7 @@ def greet(
 ) -> ChatOut:
     """Opening line when the elder app starts; body is optional."""
     try:
-        result = service.greet(body.elder_id if body else None)
+        result = service.greet(body.elder_id if body else None, body.lang if body else None)
     except ElderNotFound as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     state = request.app.state

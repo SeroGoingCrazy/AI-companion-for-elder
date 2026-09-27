@@ -1,0 +1,122 @@
+# 界面文案，简体中文。键名与 en.yaml 一致；缺键时回落到英文。
+# 只放用户可见的文案。症状名称来自 config/symptoms.yaml 的 zh 字段。
+lang_name: 中文
+switch_to: English
+dir: ltr
+
+elder:
+  subtitle: "{nickname}，我一直在这儿"
+  greeting: "{nickname}，您好！"
+  start: 开始聊天
+  hold_to_talk: 按住说话
+  press_and_speak: 按住说话
+  release_to_send: 松开就发送
+  listening: 正在听您说…
+  listening_tap: 正在听您说…说完再点一下
+  silence: 我没有听到声音，请按住下面的条再说一次。
+  mic_denied: 请允许使用麦克风，我才能听到您说话。也可以在下面打字。
+  stop_and_send: 停止并发送
+  thinking: 稍等一下…
+  speaking: "{companion}正在说话"
+  idle: 按住下面的条和我说话
+  too_short: 刚才太短了，说话时请一直按住。
+  no_recorder: 这个浏览器不能录音，您可以在下面打字。
+  not_caught: 抱歉，我没太听清，您能再说一遍吗？
+  failed: 抱歉，出了点问题，请再试一次。
+  type_instead: 改用打字
+  voice_group: "{companion}的声音"
+  voice_female: 女声
+  voice_male: 男声
+  your_message: 您要说的话
+  placeholder: 在这里打字…
+  send: 发送
+  disclaimer: "{companion}是 AI 陪伴助手，不是医疗服务。紧急情况请拨打 120。"
+
+family:
+  title: "{nickname}的今天"
+  subtitle: "{name}，正在和{companion}聊天"
+  live: 实时
+  connecting: 连接中…
+  reconnecting: 重新连接中…
+  sound_on: 提示音开
+  sound_off: 提示音关
+  today: 今天
+  tab_today: 今天
+  tab_alerts: 提醒
+  tab_monitor: 监控
+  tab_chat: 聊天
+  viewing_as: 当前身份
+  report_weekly: 周报
+  report_doctor: 就诊单页
+  report_memoir: "{nickname}的故事"
+  care_title: "{nickname}常挂在心上的"
+  care_intro: 她反复提起的人和事。
+  care_empty: 暂时还没有。她多次提到的人和话题会出现在这里。
+  reminders: 提醒事项
+  reminders_window: 近 7 天
+  reminders_intro: "{companion}会在{nickname}下次聊天时，用你的原话提起这些。"
+  reminders_empty: 还没有提醒，在下面添加一条。
+  reminder_label: "想让{companion}提醒什么？"
+  reminder_placeholder: "例如：早饭后吃降压药"
+  reminder_daily: 每天
+  reminder_once: 仅一次
+  reminder_add: 添加提醒
+  reminders_note: "{companion}只会重复你的原话，不会自行添加剂量或医疗建议。"
+  privacy_note: "当{nickname}要求某件事保密时，它不会出现在这个页面上，紧急安全告警除外。"
+  tab_care: 关心
+  refresh: 刷新
+  updating: 更新中…
+  updated: "{time} 更新"
+  new_activity: 这份小结之后还有新动态
+  summary_failed: 小结加载失败，请点刷新重试。
+  fallback_note: "AI 小结暂不可用，改为列出要点"
+  alerts: 提醒
+  no_alerts: 暂无提醒，一切都好。
+  unread: "{n} 条新"
+  mark_read: 标为已读
+  mark_as_read: 标为已读
+  urgent: 紧急
+  watch: 留意
+  from_chat: 来自聊天
+  from_fall: 跌倒检测
+  fall_alert_title: 检测到跌倒
+  fall_alert_body: "有人摔倒后{for_s}没有起身，请尽快去看看。"
+  fall_alert_for: "已经 {n} 秒"
+  snapshot_alt: 跌倒发生时的画面
+  symptoms: 近 7 天症状
+  nothing_mentioned: 没有提到不适
+  detail_where: "部位：{v}"
+  detail_duration: "持续：{v}"
+  detail_onset: "何时：{v}"
+  detail_severity: "程度：{v}"
+  detail_last_seen: "最近提到 {time}"
+  quiet_days: "{from} 至 {to} · 没有提到不适"
+  quiet_one: "{day} · 没有提到不适"
+  days_quiet: "{n} 天没有提到不适"
+  yesterday: 昨天
+  fall_title: 跌倒检测
+  fall_offline: 跌倒检测未开启。
+  fall_source: 画面来源
+  fall_camera: 摄像头
+  fall_demo: 演示视频
+  fall_pause: 暂停
+  offline: 未开启
+  conversation: 聊天记录
+  messages_today: "{nickname}今天说了 {n} 句"
+  load_earlier: 加载更早的消息
+  loading: 加载中…
+  companion_role: 陪伴助手
+  ai_note: 小结和症状记录由 AI 从{nickname}的聊天中自动整理，可能不完整，不构成医疗建议。
+
+severity:
+  red_flag: 急症信号
+  severe: 严重
+  moderate: 中等
+  mild: 轻微
+  unknown: 未说明
+
+status:
+  new: 新出现
+  ongoing: 持续
+  improved: 好转
+  resolved: 已缓解

@@ -515,8 +515,31 @@ body.family {
   .table-stack .cell-name { font-weight: 800; font-size: 17px; padding-bottom: 6px; }
   .table-stack td[data-label] { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
   .table-stack td[data-label]::before {
-    content: attr(data-label); color: var(--muted); font-size: 13px; font-weight: 700;
+    content: attr(data-label); color: var(--muted); font-size: 14px; font-weight: 700;
   }
+
+  /* A long reminder wrapped into a narrow column while its label sat beside it, because
+     the row still tried to be two columns. Below this width a label and its value each
+     get the full row. */
+  .table-stack td[data-label] { flex-wrap: wrap; row-gap: 2px; }
+  .table-stack td[data-label] > * { min-width: 0; }
+  .table-stack .cell-name { font-size: 18px; line-height: 1.35; }
+  .table-stack .adherence { justify-content: flex-start; }
+
+  /* The mood chart is an inline SVG that scales with its box; at phone width the box was
+     short enough that the day labels collided and the line had almost no room. */
+  .mood-chart .axis { font-size: 15px; }
+
+  /* Report body text was drawn for paper and for a laptop. 13px is below the floor for
+     this audience on a phone. */
+  .report-overview { font-size: 18px; }
+  .topic-days, .trend, .meta, .private-note, .report-note { font-size: 15px; }
+  .topic-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .topic-name { font-size: 16px; }
+
+  /* Three actions on one line wrapped into a ragged two rows. */
+  .report-head, .week-nav { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .week-nav .btn, .report-head .btn { flex: 1 1 auto; justify-content: center; text-align: center; }
 }
 
 .private-note { margin: 18px 0 0; padding-top: 12px; border-top: 1px solid var(--line); }
@@ -600,11 +623,16 @@ body.family {
 .report-quotes ul { margin: 0; padding-left: 18px; }
 .report-quotes q { quotes: "\201C" "\201D"; }
 .report-foot { border-top: 1px solid var(--line); padding-top: 10px; }
+/* The doctor one-pager's tables, which are not .table-stack. Scoped away from the stacked
+   tables above: both blocks used to match the weekly report's tables, this one came later
+   in the file and won, and its two-column grid put a long reminder beside its own label. */
 @media (max-width: 600px) {
-  .report-table thead { display: none; }
-  .report-table tr:first-child { display: grid; grid-template-columns: 1fr 1fr; }
-  .report-table tr:first-child th { grid-column: 1 / -1; }
-  .report-table td[data-label]::before { content: attr(data-label) ": "; color: var(--muted); font-size: 12px; }
+  .report-table:not(.table-stack) thead { display: none; }
+  .report-table:not(.table-stack) tr:first-child { display: grid; grid-template-columns: 1fr 1fr; }
+  .report-table:not(.table-stack) tr:first-child th { grid-column: 1 / -1; }
+  .report-table:not(.table-stack) td[data-label]::before {
+    content: attr(data-label) ": "; color: var(--muted); font-size: 14px;
+  }
 }
 @media print {
   body.report { background: #fff; font-size: 12px; }

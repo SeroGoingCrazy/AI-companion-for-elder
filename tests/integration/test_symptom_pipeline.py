@@ -130,7 +130,11 @@ def test_extraction_failure_does_not_affect_chat(settings: Settings) -> None:
     with TestClient(create_app(settings, llm=FailingExtractLLM.from_config())) as c:
         r = c.post("/api/chat", json={"text": CHEST})
         assert r.status_code == 200
-        assert r.json()["fallback"] is False and "911" in r.json()["reply_text"]
+        # CHEST is Chinese, so the reply is too, and it names the Chinese emergency
+        # number. Assert on the behaviour — tell her to call for help now — not on "911".
+        body = r.json()
+        assert body["fallback"] is False
+        assert "120" in body["reply_text"] or "911" in body["reply_text"]
         assert _symptoms(c) == [] and _alerts(c) == []
 
 
