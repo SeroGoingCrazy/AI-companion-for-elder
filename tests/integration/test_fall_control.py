@@ -51,7 +51,7 @@ def test_demo_mode_starts_the_demo_clip(client: TestClient, fake: _FakeFallMCP) 
     client.post("/api/fall/source", json={"mode": "demo"})
     method, path, body = fake.calls[0]
     assert (method, path) == ("POST", "/control/start")
-    assert body["source"].endswith(".mp4") and body["loop"] is True
+    assert body == {"source": "demo/videos/demo.m3u", "loop": True}
 
 
 def test_stop_and_status(client: TestClient, fake: _FakeFallMCP) -> None:
