@@ -38,7 +38,12 @@
   /** An urgent alert should take the reader to it, not leave a badge on another screen. */
   window.showTab = show;
 
-  let start = "today";
-  try { start = localStorage.getItem(KEY) || "today"; } catch { /* private mode */ }
-  show(start, false);
+  // ?tab= wins over the remembered one, so a link can open a specific screen: useful for
+  // sharing "look at the camera", and for tools that import one page at a time.
+  const asked = new URLSearchParams(window.location.search).get("tab");
+  let start = asked;
+  if (!start) {
+    try { start = localStorage.getItem(KEY); } catch { /* private mode */ }
+  }
+  show(start || "today", !asked);
 })();

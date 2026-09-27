@@ -42,3 +42,13 @@ def test_every_tab_has_a_panel(client: TestClient) -> None:
     assert tabs == {"today", "alerts", "monitor", "chat"}
     for name in tabs:
         assert f'id="panel-{name}"' in html, name
+
+
+def test_tabs_are_deep_linkable(client: TestClient) -> None:
+    """?tab= opens one screen directly, so a link can point at the camera, and so tools
+    that import a page at a time can reach all four."""
+    js = client.get("/static/tabs.js").text
+    assert 'get("tab")' in js
+    assert "URLSearchParams" in js
+    # an unknown value must fall back rather than render nothing
+    assert 'show(start || "today"' in js
