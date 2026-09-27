@@ -81,6 +81,21 @@ class SymptomSettings(_Model):
     alert_debounce_hours: float = 2
 
 
+class MemorySettings(_Model):
+    care_list_min_mentions: int = 2
+    follow_up_default_delay_days: int = 1
+    follow_up_expire_days: int = 7
+
+
+class AgendaSettings(_Model):
+    max_items_per_greet: int = 3
+
+
+class PrivacySettings(_Model):
+    max_span_user_messages: int = 3  # preceding user messages a privacy request can cover
+    bypass_levels: tuple[str, ...] = ("high",)  # alert levels that ignore privacy (ADR 19)
+
+
 class FallMCPSettings(_Model):
     host: str = "127.0.0.1"
     port: int = 8001
@@ -139,6 +154,9 @@ class Settings(_Model):
     llm: LLMSettings
     chat: ChatSettings
     symptoms: SymptomSettings
+    memory: MemorySettings = MemorySettings()
+    agenda: AgendaSettings = AgendaSettings()
+    privacy: PrivacySettings = PrivacySettings()
     fall: FallSettings
     database: DatabaseSettings
     server: ServerSettings

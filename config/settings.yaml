@@ -28,6 +28,18 @@ symptoms:
   merge_window_hours: 24
   alert_debounce_hours: 2
 
+memory:
+  care_list_min_mentions: 2          # people/topics mentioned this often appear on the care list
+  follow_up_default_delay_days: 1    # "I'll repot the orchid" with no date -> ask tomorrow
+  follow_up_expire_days: 7           # follow-ups never asked this long after they were due are dropped
+
+agenda:
+  max_items_per_greet: 3             # follow-ups carried by one greeting; the rest wait
+
+privacy:
+  max_span_user_messages: 3          # preceding user messages a privacy request can cover
+  bypass_levels: [high]              # alert levels that ignore privacy marks — do not change without an ADR
+
 fall:
   model: ${FALL_MODEL:-models/yolo11n-pose.pt}   # fetched by scripts/fetch_demo_media.py
   device: ${FALL_DEVICE:-cpu}                    # cpu | mps (Apple Silicon) | 0 (CUDA)

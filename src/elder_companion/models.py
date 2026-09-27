@@ -1,10 +1,13 @@
-"""ORM models: Elder / Message / SymptomLog / Alert (spec 3.8)."""
+"""ORM models (spec 3.12): Elder / Message / SymptomLog / Alert + Stage H tables.
+
+Stage H without reminders and the daily digest (not built in this version).
+"""
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, String, Text
+from sqlalchemy import CheckConstraint, ForeignKey, Index, String, Text, false
 from sqlalchemy.orm import Mapped, mapped_column
 
 from elder_companion.db import Base, utcnow
@@ -21,7 +24,29 @@ class Elder(Base):
     nickname: Mapped[str] = mapped_column(String(50))
     language: Mapped[str] = mapped_column(String(10), default="en")
     profile_text: Mapped[str] = mapped_column(Text, default="")
+    # Set when a greeting first explains the privacy rule and its safety exception (spec 2.7).
+    privacy_disclosed_at: Mapped[datetime | None] = mapped_column()
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class FamilyMember(Base):
+    __tablename__ = "family_member"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    elder_id: Mapped[int] = mapped_column(ForeignKey("elder.id"))
+    name: Mapped[str] = mapped_column(String(100))
+    relation: Mapped[str] = mapped_column(String(50), default="")
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class ChatSession(Base):
+    """One visit to the elder app, started by the greeting."""
+
+    __tablename__ = "chat_session"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    elder_id: Mapped[int] = mapped_column(ForeignKey("elder.id"))
+    started_at: Mapped[datetime] = mapped_column(default=utcnow)
 
 
 class Message(Base):
@@ -33,9 +58,12 @@ class Message(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     elder_id: Mapped[int] = mapped_column(ForeignKey("elder.id"))
+    session_id: Mapped[int | None] = mapped_column(ForeignKey("chat_session.id"))
     role: Mapped[str] = mapped_column(String(10))
     text: Mapped[str] = mapped_column(Text)
     audio_path: Mapped[str | None] = mapped_column(String(255))
+    # "Keep this between us": hidden from every family view, still in the agent's context.
+    private: Mapped[bool] = mapped_column(default=False, server_default=false())
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
 
@@ -75,5 +103,75 @@ class Alert(Base):
     content: Mapped[str] = mapped_column(Text, default="")
     snapshot_path: Mapped[str | None] = mapped_column(String(255))
     ref_id: Mapped[str | None] = mapped_column(String(64))
+    # The elder message behind a symptom alert (not part of the POST /api/alerts contract);
+    # lets the family view hide non-bypass alerts raised inside a private segment.
+    message_id: Mapped[int | None] = mapped_column(ForeignKey("message.id"))
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     is_read: Mapped[bool] = mapped_column(default=False)
+
+
+class SymptomMention(Base):
+    """One occurrence of a symptom, linked to the message it came from (for privacy)."""
+
+    __tablename__ = "symptom_mention"
+    __table_args__ = (Index("ix_symptom_mention_log", "symptom_log_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    symptom_log_id: Mapped[int] = mapped_column(ForeignKey("symptom_log.id"))
+    message_id: Mapped[int | None] = mapped_column(ForeignKey("message.id"))
+    raw_quote: Mapped[str] = mapped_column(Text)
+    severity: Mapped[str] = mapped_column(String(20), default="unknown")
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+MEMORY_KINDS = ("follow_up", "person", "topic", "story")
+
+
+class MemoryItem(Base):
+    """Small life details the companion remembers (spec 3.7)."""
+
+    __tablename__ = "memory_item"
+    __table_args__ = (
+        CheckConstraint("kind IN ('follow_up', 'person', 'topic', 'story')", name="ck_memory_kind"),
+        CheckConstraint("status IN ('open', 'asked', 'expired')", name="ck_memory_status"),
+        Index("ix_memory_elder_kind", "elder_id", "kind", "last_seen"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    elder_id: Mapped[int] = mapped_column(ForeignKey("elder.id"))
+    kind: Mapped[str] = mapped_column(String(20))
+    subject: Mapped[str] = mapped_column(String(200))
+    text: Mapped[str] = mapped_column(Text)
+    raw_quote: Mapped[str] = mapped_column(Text)
+    message_id: Mapped[int | None] = mapped_column(ForeignKey("message.id"))
+    # Private only while every mention was private.
+    private: Mapped[bool] = mapped_column(default=False, server_default=false())
+    mention_count: Mapped[int] = mapped_column(default=1)
+    due_date: Mapped[date | None] = mapped_column()  # follow_up: the elder's local date
+    status: Mapped[str] = mapped_column(String(10), default="open")
+    retelling: Mapped[str | None] = mapped_column(Text)  # story: cached memoir retelling
+    first_seen: Mapped[datetime] = mapped_column(default=utcnow)
+    last_seen: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+CLAIM_TARGETS = ("alert", "memory_item", "symptom_log")
+
+
+class Claim(Base):
+    """A family member taking something on: "Ben: I'll call her doctor"."""
+
+    __tablename__ = "claim"
+    __table_args__ = (
+        CheckConstraint(
+            "target_type IN ('alert', 'memory_item', 'symptom_log')", name="ck_claim_target"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    elder_id: Mapped[int] = mapped_column(ForeignKey("elder.id"))
+    target_type: Mapped[str] = mapped_column(String(20))
+    target_id: Mapped[int] = mapped_column()
+    member_id: Mapped[int] = mapped_column(ForeignKey("family_member.id"))
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    done_at: Mapped[datetime | None] = mapped_column()

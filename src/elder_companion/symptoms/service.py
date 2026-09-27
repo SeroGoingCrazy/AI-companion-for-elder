@@ -15,7 +15,7 @@ from elder_companion.alerts.schemas import AlertIn, AlertLevel, AlertOut
 from elder_companion.alerts.service import last_symptom_alert_at
 from elder_companion.db import utcnow
 from elder_companion.llm import ChatMessage, LLMError
-from elder_companion.models import Alert, Elder, Message, SymptomLog
+from elder_companion.models import Alert, Elder, Message, SymptomLog, SymptomMention
 from elder_companion.settings import SymptomSettings
 from elder_companion.symptoms.extractor import SymptomExtractor
 from elder_companion.symptoms.merge import find_match, merge_symptom
@@ -116,6 +116,16 @@ class SymptomService:
             for key, value in result.values.items():
                 setattr(row, key, value)
         self._session.flush()  # assigns row.id for the alert's ref_id
+        # One row per occurrence: the family view counts and quotes only visible ones.
+        self._session.add(
+            SymptomMention(
+                symptom_log_id=row.id,
+                message_id=msg.id,
+                raw_quote=item.raw_quote,
+                severity=item.severity,
+                created_at=now,
+            )
+        )
         return row
 
     def _alert(
@@ -132,7 +142,12 @@ class SymptomService:
             type="symptom", level=level, title=title, content=content, ref_id=str(row.id)
         )
         # created_at uses the service clock so debounce comparisons stay consistent.
-        alert = Alert(**data.model_dump(exclude={"elder_id"}), elder_id=elder.id, created_at=now)
+        alert = Alert(
+            **data.model_dump(exclude={"elder_id"}),
+            elder_id=elder.id,
+            message_id=msg.id,
+            created_at=now,
+        )
         self._session.add(alert)
         self._session.flush()
         return alert
