@@ -47,6 +47,19 @@ That prints a public `https://….trycloudflare.com` address. Open it on the pho
 
 Icons are generated, not hand-drawn — rerun `scripts/make_icons.py` if the palette changes.
 
+### Demo screenshots
+
+`demo/shots/` holds the pitch-deck shots, and they are reproducible rather than hand-taken:
+the script replays the DEV_SPEC demo script against a running server and captures the elder
+app at phone size and the dashboard at laptop size, including the urgent alert arriving live.
+
+```bash
+uv run --with playwright python scripts/demo_shots.py
+```
+
+It drives the copy of Chrome already on the machine, so there is no browser download. Run it
+against a fresh `data/app.db` for clean shots.
+
 ## Fall detection (fall-mcp)
 
 Needs the optional vision dependencies, the pose model and the demo clips
@@ -82,6 +95,7 @@ src/fall_detector/      fall-mcp: pose estimation, fall state machine, MCP tools
 tests/                  unit / integration tests (offline, mock LLM)
 eval/                   symptom extraction eval set
 demo/                   demo videos and script
-scripts/                fetch_demo_media.py (model + clips), make_icons.py (PWA icons)
+scripts/                fetch_demo_media.py (model + clips), make_icons.py (PWA icons),
+                        demo_shots.py (pitch-deck screenshots)
 docs/                   mcp_desktop.md (Claude Desktop setup)
 ```
