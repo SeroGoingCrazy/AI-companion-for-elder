@@ -21,6 +21,22 @@ cp .env.example .env   # then set OPENAI_API_KEY
 uv run pytest -q
 ```
 
+## Languages
+
+The interface ships in English and Simplified Chinese (`config/i18n/*.yaml`). English is the
+default; a switch in each header sets a `lang` cookie, and `?lang=zh` pins it for a demo link
+without touching the cookie.
+
+Two things deliberately do not follow that switch. The companion's replies and the daily
+summary follow the language the elder actually spoke, which the prompt handles. So does the
+line spoken back to her when speech could not be understood: a Chinese speaker hears Chinese
+even when her family has set the dashboard to English.
+
+Symptom names are not in the i18n files. `config/symptoms.yaml` already carries `en` and `zh`
+for every canonical and stays the single source of truth; the API returns both and the page
+picks one. Stored alert titles stay in English as the record of what happened, and are
+re-derived for display from the symptom the alert points at.
+
 ## Install on a phone (PWA)
 
 Both surfaces are installable, so the demo runs full screen with no browser chrome:
@@ -67,21 +83,24 @@ Needs the optional vision dependencies, the pose model and the demo clips
 
 ```bash
 uv sync --extra vision
-uv run python scripts/fetch_demo_media.py      # models/yolo11n-pose.pt + demo/videos/*.mp4
+uv run --extra vision python scripts/fetch_demo_media.py   # models/ + demo/videos/
 ```
+
+`uv run` re-syncs to the default dependency set and removes the vision extra, so the
+`--extra vision` is needed on every vision command, not just the install.
 
 Run it next to the web app (`uv run elder-web`):
 
 ```bash
-uv run python -m fall_detector.server                          # :8001, loops demo/videos/walk.mp4
-uv run python -m fall_detector.ctl play demo/videos/fall_01.mp4  # demo step: play the fall once
-uv run python -m fall_detector.ctl play demo/videos/walk.mp4 --loop
+uv run --extra vision python -m fall_detector.server                          # :8001, loops demo/videos/walk.mp4
+uv run --extra vision python -m fall_detector.ctl play demo/videos/fall_01.mp4  # demo step: play the fall once
+uv run --extra vision python -m fall_detector.ctl play demo/videos/walk.mp4 --loop
 ```
 
 The dashboard's fall panel shows the live view (`:8001/stream`); a confirmed fall posts an alert with a
 snapshot to the dashboard. Use a camera with `--source 0` (or `FALL_SOURCE=0`); on Apple Silicon set
 `FALL_DEVICE=mps`. Check a single clip without the service:
-`uv run python -m fall_detector --source demo/videos/lie_down.mp4 --show`.
+`uv run --extra vision python -m fall_detector --source demo/videos/lie_down.mp4 --show`.
 
 MCP: Streamable HTTP at `http://127.0.0.1:8001/mcp`, or stdio for Claude Desktop — see
 [docs/mcp_desktop.md](docs/mcp_desktop.md).
