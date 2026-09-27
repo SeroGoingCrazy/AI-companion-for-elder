@@ -5,13 +5,21 @@ Every read goes through `privacy` (spec 3.9)."""
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import BaseModel, ConfigDict
+from fastapi import APIRouter, HTTPException, Query, Request, status
+from pydantic import BaseModel, ConfigDict, Field
 
 from elder_companion.dashboard import symptom_timeline
 from elder_companion.db import UtcDateTime
 from elder_companion.elders import ElderNotFound, get_elder
+from elder_companion.family_loop.claims import (
+    ClaimError,
+    create_claim,
+    list_claims,
+    list_members,
+    mark_done,
+)
 from elder_companion.memory.care_list import CARE_KINDS, care_list
 from elder_companion.models import Elder
 from elder_companion.privacy import SymptomView, history_page, visible_memory
@@ -181,3 +189,76 @@ def get_care_list(
         request.app.state.settings.memory.care_list_min_mentions,
     )
     return [CareItemOut.model_validate(i) for i in items]
+
+
+# ---------- sibling sharing (spec 2.6) ----------
+
+
+class MemberOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    relation: str
+
+
+@router.get("/family/members", response_model=list[MemberOut])
+def get_members(session: SessionDep, elder_id: int | None = None) -> list[MemberOut]:
+    elder = elder_or_404(session, elder_id)
+    return [MemberOut.model_validate(m) for m in list_members(session, elder.id)]
+
+
+class ClaimIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    target_type: Literal["alert", "memory_item", "symptom_log"]
+    target_id: int
+    member_id: int
+    note: str = Field(default="", max_length=500)
+    elder_id: int | None = None
+
+
+class ClaimOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    target_type: str
+    target_id: int
+    member_id: int
+    member_name: str
+    note: str
+    created_at: UtcDateTime
+    done_at: UtcDateTime | None
+
+
+@router.get("/claims", response_model=list[ClaimOut])
+def get_claims(session: SessionDep, elder_id: int | None = None) -> list[ClaimOut]:
+    """Who is handling what, newest first (done ones included, with done_at)."""
+    elder = elder_or_404(session, elder_id)
+    return [ClaimOut.model_validate(c) for c in list_claims(session, elder.id)]
+
+
+@router.post("/claims", response_model=ClaimOut, status_code=status.HTTP_201_CREATED)
+def post_claim(body: ClaimIn, session: SessionDep) -> ClaimOut:
+    """ "Ben: I'll call her doctor" on an alert, care-list item or symptom."""
+    elder = elder_or_404(session, body.elder_id)
+    try:
+        claim = create_claim(
+            session,
+            elder.id,
+            target_type=body.target_type,
+            target_id=body.target_id,
+            member_id=body.member_id,
+            note=body.note,
+        )
+    except ClaimError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    return ClaimOut.model_validate(claim)
+
+
+@router.post("/claims/{claim_id}/done", response_model=ClaimOut)
+def post_claim_done(claim_id: int, session: SessionDep) -> ClaimOut:
+    try:
+        return ClaimOut.model_validate(mark_done(session, claim_id))
+    except ClaimError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
