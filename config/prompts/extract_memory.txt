@@ -21,6 +21,12 @@ Privacy requests
 - Then set privacy_request.requested to true, and list in covers_message_ids the ids of her messages that the request is about: her current message, and earlier messages of hers (from the recent conversation) that are about the same thing. Otherwise requested is false and covers_message_ids is empty.
 - A privacy request never changes which items you extract.
 
+Reminder answers
+- The companion may have raised a reminder a family member set ("Amy asked me to check - have you had your blood pressure pill?"). Those reminders are listed for you with their reminder_id.
+- If her current utterance answers one of them, add it to reminder_acks: "confirmed" when she says she has done it ("yes, took it with breakfast", "吃过了"), "declined" when she says she has not or will not ("not yet", "I'll do it later", "还没呢").
+- Only ever use a reminder_id from that list. If no reminder was raised, or she is talking about something else, leave reminder_acks empty.
+- "Not yet" is declined, not a missed answer. Say nothing about whether she should take it: you only record what she said.
+
 Examples
 Current utterance [#12]: "I'm going to repot my orchid this week."
 {"items": [{"kind": "follow_up", "subject": "orchid", "text": "planning to repot her orchid this week", "due_in_days": 3, "raw_quote": "I'm going to repot my orchid this week"}], "privacy_request": {"requested": false, "covers_message_ids": []}}
@@ -40,3 +46,11 @@ Current utterance [#50]: "When I started teaching in 1972, my first class had fo
 
 Current utterance [#55]: "I had some toast and watched TV."
 {"items": [], "privacy_request": {"requested": false, "covers_message_ids": []}}
+
+Reminders already raised today: [reminder_id=7] blood pressure pill
+Current utterance [#61]: "Yes, I took it right after breakfast."
+{"items": [], "privacy_request": {"requested": false, "covers_message_ids": []}, "reminder_acks": [{"reminder_id": 7, "status": "confirmed"}]}
+
+Reminders already raised today: [reminder_id=7] blood pressure pill
+Current utterance [#63]: "Not yet, I'll do it after lunch."
+{"items": [], "privacy_request": {"requested": false, "covers_message_ids": []}, "reminder_acks": [{"reminder_id": 7, "status": "declined"}]}

@@ -30,18 +30,24 @@ _CJK = re.compile(r"[一-鿿]")
 # placeholder below where the real model would give that id (privacy_request.covers_message_ids).
 _CURRENT_ID = re.compile(r"\[#(\d+)\]:?\s*\n[^\n]*\Z")
 CURRENT_MESSAGE_ID = "$current_message_id"
+# The same prompt lists reminders raised today as "[reminder_id=<id>] <text>"; a canned ack
+# uses the placeholder below for the first of them.
+_OPEN_REMINDER_ID = re.compile(r"\[reminder_id=(\d+)\]")
+OPEN_REMINDER_ID = "$open_reminder_id"
 
 
-def _fill_current_id(value: Any, current_id: int | None) -> Any:
+def _fill_ids(value: Any, ids: dict[str, int | None]) -> Any:
+    """Replace placeholders with the ids read from the prompt. A list entry whose placeholder
+    has no value is dropped; a dict holding one (e.g. a reminder ack) is dropped whole."""
     if isinstance(value, dict):
-        return {k: _fill_current_id(v, current_id) for k, v in value.items()}
+        filled = {k: _fill_ids(v, ids) for k, v in value.items()}
+        return None if any(v is None and k in _ID_KEYS for k, v in filled.items()) else filled
     if isinstance(value, list):
-        return [
-            _fill_current_id(v, current_id)
-            for v in value
-            if not (v == CURRENT_MESSAGE_ID and current_id is None)
-        ]
-    return current_id if value == CURRENT_MESSAGE_ID else value
+        return [f for f in (_fill_ids(v, ids) for v in value) if f is not None]
+    return ids.get(value, value) if value in ids else value
+
+
+_ID_KEYS = ("reminder_id",)
 
 
 def _match(text: str, rules: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -93,8 +99,15 @@ class MockLLMClient(BaseLLMClient):
         last = user_text.rsplit("\n\n", 1)[-1]
         rule = _match(last, cfg.get("rules", []))
         result = copy.deepcopy(rule["result"] if rule else cfg.get("default", {}))
-        m = _CURRENT_ID.search(last)
-        return _fill_current_id(result, int(m.group(1)) if m else None)
+        current = _CURRENT_ID.search(last)
+        reminder = _OPEN_REMINDER_ID.search(user_text)
+        return _fill_ids(
+            result,
+            {
+                CURRENT_MESSAGE_ID: int(current.group(1)) if current else None,
+                OPEN_REMINDER_ID: int(reminder.group(1)) if reminder else None,
+            },
+        )
 
     def transcribe(self, audio: bytes, *, filename: str, language: str | None = None) -> str:
         self.calls.append(("transcribe", filename))
