@@ -160,9 +160,19 @@ def build_context(
     return [{"role": "system", "content": system}, *history_messages(history, history_turns)]
 
 
-def greeting_language(elder: Elder, history: Sequence[Message]) -> str:
+def greeting_language(
+    elder: Elder, history: Sequence[Message], prefer: str | None = None
+) -> str:
+    """What language to open in.
+
+    What she said last is the strongest signal. On a first chat there is nothing to read,
+    so `prefer` carries the language her own app is set to — on the elder surface the
+    person who chose it is her — and her stored language is the last resort.
+    """
     last_user = next((m for m in reversed(history) if m.role == "user"), None)
-    return detect_language(last_user.text) if last_user else (elder.language or "en")
+    if last_user:
+        return detect_language(last_user.text)
+    return prefer or elder.language or "en"
 
 
 def agenda_line(index: int, item: AgendaItem) -> str:
@@ -207,6 +217,7 @@ def build_greet_context(
     disclose_privacy: bool = False,
     family_name: str = DEFAULT_FAMILY_NAME,
     sharing: Sequence[ShareConsent] = (),
+    language: str | None = None,
 ) -> list[ChatMessage]:
     """Same context, ending with a system instruction to open the conversation. The session
     agenda (spec 3.8) takes the greeting's one question; otherwise it follows up on a
@@ -237,7 +248,7 @@ def build_greet_context(
         if disclose_privacy
         else ""
     )
-    lang = greeting_language(elder, history)
+    lang = greeting_language(elder, history, language)
     instruction = render_prompt(
         "greet",
         nickname=elder.nickname,

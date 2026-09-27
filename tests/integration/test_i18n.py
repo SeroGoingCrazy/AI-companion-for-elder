@@ -103,3 +103,18 @@ def test_match_distinguishes_english_from_unknown() -> None:
 def test_accept_language_is_the_last_resort() -> None:
     assert resolve(None, None, "zh-CN,zh;q=0.9,en;q=0.8") == "zh"
     assert resolve(None, "en", "zh-CN") == "en", "a remembered choice outranks the browser"
+
+
+@pytest.mark.parametrize(("lang", "pattern"), [("zh", r"[一-鿿]"), ("en", r"[A-Za-z]")])
+def test_the_opening_line_follows_her_app(client: TestClient, lang: str, pattern: str) -> None:
+    """On a first chat there is nothing she has said yet to infer a language from, so the
+    greeting follows the language her own app is set to. Without this the Chinese demo
+    opened in English."""
+    import re as _re
+
+    reply = client.post("/api/chat/greet", json={"elder_id": 1, "lang": lang}).json()["reply_text"]
+    assert _re.search(pattern, reply), f"{lang}: {reply!r}"
+
+
+def test_the_elder_page_tells_the_server_its_language(client: TestClient) -> None:
+    assert "lang: cfg.lang" in client.get("/static/elder.js").text

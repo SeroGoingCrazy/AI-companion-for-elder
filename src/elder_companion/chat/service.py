@@ -134,7 +134,7 @@ class ChatService:
             return NEED_RETRY
         return self.reply(elder.id, text)
 
-    def greet(self, elder_id: int | None) -> ChatResult:
+    def greet(self, elder_id: int | None, language: str | None = None) -> ChatResult:
         """Start a session: open with the agenda (due follow-ups, spec 3.8) and, the very
         first time, the privacy disclosure (spec 2.7). Items are marked delivered only when
         the model's greeting (not the canned fallback) carried them."""
@@ -158,6 +158,7 @@ class ChatService:
             disclose_privacy=disclose,
             family_name=self._family_name(elder),
             sharing=sharing_choices(self._session, elder.id),
+            language=language,
         )
         try:
             raw = tidy_reply(self._llm.chat(messages, max_tokens=self._s.max_reply_tokens))
@@ -167,7 +168,7 @@ class ChatService:
             carried = reply == raw
         except LLMError:
             logger.warning("greet LLM call failed; using fallback greeting", exc_info=True)
-            lang = greeting_language(elder, history)
+            lang = greeting_language(elder, history, language)
             template = FALLBACK_GREETING.get(lang, FALLBACK_GREETING["en"])
             reply = template.format(part_of_day=part_of_day(now), nickname=elder.nickname)
             fallback, carried = True, False

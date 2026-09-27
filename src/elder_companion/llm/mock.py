@@ -51,8 +51,16 @@ _ID_KEYS = ("reminder_id",)
 
 
 def _match(text: str, rules: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """First rule that matches wins, so order in the YAML is the priority order.
+
+    `match` needs any one of its keywords; `match_all` needs all of them, which is how a
+    rule says "a first chat, and in Chinese" without a second rule list.
+    """
     lowered = text.lower()
     for rule in rules:
+        required = rule.get("match_all")
+        if required and all(k.lower() in lowered for k in required):
+            return rule
         if any(k.lower() in lowered for k in rule.get("match", [])):
             return rule
     return None

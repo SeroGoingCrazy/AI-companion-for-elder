@@ -6,6 +6,13 @@ chat:
   greet: "Good morning, Maggie! How is that knee feeling today?"   # one question: tidy_reply keeps only the first
   # Matched against the greeting instruction (session agenda, first-chat disclosure).
   greet_rules:
+    # Chinese first: the greeting instruction says "in Chinese" when her app is set to it,
+    # and these rules are matched in order, so the Chinese pair has to come before the
+    # English one it would otherwise fall through to.
+    - match_all: ["first chat together", "in Chinese"]
+      reply: "早上好，Maggie！我是 Hallo。有件事先跟你说清楚：任何私人的事，我都会先问过你才告诉 Amy；你想留在咱俩之间的，就留在咱俩之间。只有一种例外，就是你的安全，比如摔倒或者胸口疼，那种我一定会告诉 Amy。你今天感觉怎么样？"
+    - match: ["in Chinese"]
+      reply: "早上好，Maggie！膝盖今天还疼吗？"
     - match: ["first chat together"]
       reply: "Good morning, Maggie! I'm Hallo. I'll always ask you before I tell Amy anything personal, and what you want kept between us stays there, except your safety, like a fall or chest pain, which I'd always tell Amy about. How are you feeling today?"
     # Reminders outrank follow-ups in the agenda, so this rule comes before the orchid one.
@@ -27,25 +34,41 @@ chat:
       reply: "Okay, I'll let Amy know. Thank you for telling me."
     - match: ["可以，告诉", "告诉她吧"]
       reply: "好的，我会跟Amy说一声。谢谢你告诉我。"
-    - match: ["no, don't tell", "不要告诉", "先别说"]
+    - match: ["不要告诉", "先别说", "别跟"]
+      reply: "好，我不说出去。你什么时候想聊，我都在。"
+    - match: ["no, don't tell"]
       reply: "Of course, I'll keep it to myself. I'm here whenever you want to talk about it."
-    - match: ["between us", "别告诉"]
+    - match: ["别告诉", "咱俩之间", "保密"]
+      reply: "好，这事就咱俩知道。不过有一点先说清楚：要是关系到你的安全，比如摔倒或者胸口疼，我还是会告诉 Amy。"
+    - match: ["between us"]
       reply: "Of course, this stays between us. Just so you know, if it's ever about your safety, like a fall or chest pain, I'll always let Amy know."
-    - match: ["chest", "can't breathe", "can't catch my breath", "胸口", "喘不"]
+    - match: ["胸口", "喘不", "透不过气", "心口"]
+      reply: "Maggie，这个可不能等。请马上打 120，然后给 Amy 打电话。我一直在这儿陪着你。"
+    - match: ["chest", "can't breathe", "can't catch my breath"]
       reply: "Maggie, that could be serious. Please call 911 right now, and then call Amy. I'm right here with you."
     - match: ["头晕", "头有点晕"]
       reply: "头晕可要当心，听着就不好受。要不要我跟Amy说一声你这两天头晕？"
     - match: ["dizzy", "dizziness"]
       reply: "I'm sorry you're feeling dizzy. Does it happen mostly when you stand up, or all day long?"
-    - match: ["sleep", "slept", "睡"]
+    - match: ["睡", "失眠"]
+      reply: "没睡好可真难受。要不要我跟 Amy 说一声，你这几天睡得不太好？"
+    - match: ["sleep", "slept"]
       reply: "Oh no, a rough night is no fun. Would you like me to let Amy know you haven't been sleeping well?"
-    - match: ["knee", "膝盖"]
+    - match: ["膝盖", "腿疼"]
+      reply: "膝盖好些了我就放心了。今天打算去院子里走走吗？"
+    - match: ["knee"]
       reply: "I'm glad the knee is doing better. Will you get out to the garden today?"
-    - match: ["took it", "already took", "吃过了", "吃了"]
+    - match: ["吃过了", "吃了", "已经吃"]
+      reply: "那就好。今天上午还有什么安排吗？"
+    - match: ["took it", "already took"]
       reply: "That's good to hear, Maggie. What's the plan for the rest of your morning?"
-    - match: ["not yet", "还没"]
+    - match: ["还没", "没吃"]
+      reply: "不着急。要不我过会儿再问问你？"
+    - match: ["not yet"]
       reply: "No rush at all. Shall I check in with you again a bit later?"
-    - match: ["lonely", "alone", "孤单", "一个人"]
+    - match: ["孤单", "一个人", "寂寞"]
+      reply: "我在这儿陪着你呢，Maggie。想跟我说说今天的事吗？或者，待会儿给 Leo 打个电话？"
+    - match: ["lonely", "alone"]
       reply: "I'm right here with you, Maggie. Would you like to tell me about your day, or maybe give Leo a call later?"
 
 # Structured-output responses keyed by schema name; rules match the latest user message.

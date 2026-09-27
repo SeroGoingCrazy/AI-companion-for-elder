@@ -465,7 +465,8 @@
     if (navigator.mediaDevices && window.MediaRecorder) ensureStream().catch(() => {});
     const t0 = performance.now();
     try {
-      const data = await postJSON("/api/chat/greet", cfg.elderId ? { elder_id: cfg.elderId } : {});
+      const data = await postJSON("/api/chat/greet",
+        { ...(cfg.elderId ? { elder_id: cfg.elderId } : {}), lang: cfg.lang });
       logTiming("greeting", t0);
       await showReply(data);
     } catch (err) {

@@ -25,7 +25,11 @@ body {
   font-size: var(--t-elder-body);
   line-height: 1.5;
   -webkit-text-size-adjust: 100%;
-  overflow-x: hidden;
+  /* The app fills the screen and scrolls inside the conversation, never as a page. A page
+     scroll carried the header and the talk bar off the display as the chat grew, which is
+     the one control she is meant to be able to reach without thinking. */
+  overflow: hidden;
+  height: 100%;
 }
 
 .visually-hidden {
@@ -34,7 +38,7 @@ body {
 }
 
 .elder-app {
-  min-height: 100dvh;
+  height: 100dvh;
   display: flex; flex-direction: column;
   padding: max(18px, env(safe-area-inset-top)) var(--gutter)
            max(14px, env(safe-area-inset-bottom));
@@ -85,9 +89,12 @@ body {
  * last few turns on screen, which is why there is no scrollback treatment here. */
 
 .chat { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+/* Everything below the conversation is fixed furniture: it must not be pushed off-screen. */
+.status, .mic, .mic-hint, .type-instead, .disclaimer { flex: none; }
 
 .conversation {
-  flex: 1; min-height: 0; overflow-y: auto;
+  flex: 1; min-height: 0;
+  overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
   display: flex; flex-direction: column; justify-content: flex-end; gap: 12px;
   padding: 22px 0 16px;
 }

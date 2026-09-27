@@ -55,3 +55,23 @@ def test_tabs_are_deep_linkable(client: TestClient) -> None:
     assert "URLSearchParams" in js
     # an unknown value must fall back rather than render nothing
     assert 'show(start || "today"' in js
+
+
+def test_elder_app_scrolls_inside_the_conversation(client: TestClient) -> None:
+    """Not as a page. A page scroll carried the header and the talk bar off the display as
+    the chat grew, and the talk bar is the one control she must always be able to reach."""
+    css = client.get("/static/elder.css").text
+    body = re.search(r"\nbody \{([^}]*)\}", css)
+    assert body and "overflow: hidden" in body.group(1)
+    app = re.search(r"\.elder-app \{([^}]*)\}", css)
+    assert app and "height: 100dvh" in app.group(1)
+    conv = re.search(r"\.conversation \{([^}]*)\}", css)
+    assert conv and "overflow-y: auto" in conv.group(1)
+
+
+def test_mock_chinese_utterances_get_chinese_replies(client: TestClient) -> None:
+    """The offline demo is what a judge sees. A Chinese speaker must not be answered in
+    English, least of all on the emergency turn."""
+    for text in ("我胸口有点闷，喘不上气", "这两天早上起来头有点晕", "昨天晚上没睡好"):
+        reply = client.post("/api/chat", json={"elder_id": 1, "text": text}).json()["reply_text"]
+        assert re.search(r"[一-鿿]", reply), f"{text!r} -> {reply!r}"
