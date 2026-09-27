@@ -8,6 +8,7 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Query,
     Request,
     Response,
     UploadFile,
@@ -149,10 +150,19 @@ def greet(
     response_class=FileResponse,
     responses={200: {"content": {"audio/mpeg": {}}}, 204: {"description": "TTS unavailable"}},
 )
-def tts(message_id: int, request: Request, service: ChatServiceDep) -> Response:
-    """mp3 of an assistant reply (generated once, then cached). 204 = speak/show text instead."""
+def tts(
+    message_id: int,
+    request: Request,
+    service: ChatServiceDep,
+    voice: str | None = Query(None, description="a key of llm.tts_voices, e.g. female / male"),
+) -> Response:
+    """mp3 of an assistant reply (generated once per voice, then cached). 204 = speak/show text
+    instead."""
+    voices = request.app.state.settings.llm.tts_voices
+    if voice is not None and voice not in voices:
+        raise HTTPException(status_code=422, detail=f"voice must be one of {sorted(voices)}")
     try:
-        path = service.synthesize(message_id)
+        path = service.synthesize(message_id, voices[voice] if voice else None)
     except MessageNotFound as e:
         raise HTTPException(
             status_code=404, detail=f"assistant message {message_id} not found"
@@ -162,7 +172,7 @@ def tts(message_id: int, request: Request, service: ChatServiceDep) -> Response:
     # no-cache = revalidate with the ETag every time. Message ids restart after a DB reset,
     # so a long max-age would make the browser replay stale audio for a new message.
     stat = path.stat()
-    etag = f'"{message_id}-{stat.st_mtime_ns}-{stat.st_size}"'
+    etag = f'"{path.stem}-{stat.st_mtime_ns}-{stat.st_size}"'
     headers = {"Cache-Control": "no-cache", "ETag": etag}
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers=headers)
