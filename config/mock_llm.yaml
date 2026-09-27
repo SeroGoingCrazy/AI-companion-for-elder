@@ -12,7 +12,7 @@ chat:
       reply: "Maggie was in good spirits and chatted about her garden. She mentioned feeling dizzy in the mornings and, later, chest tightness with trouble breathing, which raised an emergency alert. Please check in with her today."
   rules:
     - match: ["chest", "can't breathe", "can't catch my breath", "胸口", "喘不"]
-      reply: "Maggie, that could be serious. Please call 911 right now, and then call Emily. I'm right here with you."
+      reply: "Maggie, that could be serious. Please call 911 right now, and then call Amy. I'm right here with you."
     - match: ["头晕", "头有点晕"]
       reply: "头晕可要当心。是起床的时候比较晕，还是一整天都晕？这几天血压药都按时吃了吗？"
     - match: ["dizzy", "dizziness"]
