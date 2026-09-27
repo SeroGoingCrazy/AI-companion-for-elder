@@ -1,5 +1,8 @@
 """Today's summary for the family dashboard (spec 5.4): today's chat + symptoms + alerts -> LLM.
 
+Only what the family may see goes in (spec 3.9): private messages are left out, and a day with
+a private segment ends with a fixed note added in code, never by the model.
+
 Results are cached per elder and day. A cached summary is reused while the underlying data is
 unchanged (and for at most `ttl`), so the demo's "refresh" right after a new symptom does not
 show a stale summary, while repeated dashboard loads cost no API calls.
@@ -9,18 +12,26 @@ from __future__ import annotations
 
 import logging
 import threading
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
 from elder_companion.chat.context import to_local
-from elder_companion.dashboard import alerts_on, messages_on, symptoms_on
+from elder_companion.dashboard import local_day_bounds
 from elder_companion.db import utcnow
 from elder_companion.elders import get_elder
 from elder_companion.llm import BaseLLMClient, LLMError
-from elder_companion.models import Alert, Elder, Message, SymptomLog
+from elder_companion.models import Alert, Elder, Message
+from elder_companion.privacy import (
+    DEFAULT_BYPASS_LEVELS,
+    PRIVATE_DAY_NOTE,
+    SymptomView,
+    visible_alerts,
+    visible_messages,
+    visible_symptoms,
+)
 from elder_companion.prompts import render_prompt
 
 logger = logging.getLogger(__name__)
@@ -38,6 +49,7 @@ class SummaryResult:
     generated_at: datetime  # naive UTC
     fallback: bool = False  # True when the LLM failed and a plain rule-based summary was used
     empty: bool = False  # True when she has not chatted today
+    has_private: bool = False  # part of today's conversation was private (the note is added)
 
 
 def _clip(text: str) -> str:
@@ -51,7 +63,7 @@ def _hhmm(ts: datetime, now: datetime) -> str:
 
 def format_notes(
     messages: Sequence[Message],
-    symptoms: Sequence[SymptomLog],
+    symptoms: Sequence[SymptomView],
     alerts: Sequence[Alert],
     now: datetime,
     *,
@@ -89,7 +101,7 @@ def format_notes(
 def fallback_summary(
     elder: Elder,
     messages: Sequence[Message],
-    symptoms: Sequence[SymptomLog],
+    symptoms: Sequence[SymptomView],
     alerts: Sequence[Alert],
 ) -> str:
     turns = sum(m.role == "user" for m in messages)
@@ -101,6 +113,10 @@ def fallback_summary(
     return " ".join(parts)
 
 
+def with_note(summary: str, note: str) -> str:
+    return f"{summary} {note}" if note else summary
+
+
 class DailySummary:
     def __init__(
         self,
@@ -109,8 +125,10 @@ class DailySummary:
         companion_name: str,
         ttl: timedelta = DEFAULT_TTL,
         clock: Callable[[], datetime] = utcnow,
+        bypass_levels: Collection[str] = DEFAULT_BYPASS_LEVELS,
     ) -> None:
         self._llm = llm
+        self._bypass = tuple(bypass_levels)
         self._companion_name = companion_name
         self._ttl = ttl
         self._clock = clock
@@ -123,14 +141,27 @@ class DailySummary:
         """Summary of the elder's local day containing `now` (an aware datetime in her zone)."""
         elder = get_elder(session, elder_id)
         day = now.date()
-        messages = messages_on(session, elder.id, day, now)
+        start, end = local_day_bounds(day, now)
+        messages, private_ids = visible_messages(session, elder.id, start, end)
+        note = PRIVATE_DAY_NOTE.format(nickname=elder.nickname) if private_ids else ""
         if not any(m.role == "user" for m in messages):
+            if note:  # she only talked privately today: say so, and nothing else
+                return SummaryResult(note, self._clock(), has_private=True)
             return SummaryResult(EMPTY_SUMMARY, self._clock(), empty=True)
-        symptoms = symptoms_on(session, elder.id, day, now)
-        alerts = alerts_on(session, elder.id, day, now)
+        symptoms = visible_symptoms(
+            session, elder.id, since=start, until=end, bypass_levels=self._bypass
+        )
+        alerts = sorted(
+            visible_alerts(
+                session, elder.id, limit=100, since=start, until=end, bypass_levels=self._bypass
+            ),
+            key=lambda a: (a.created_at, a.id),
+        )
 
         key = (elder.id, day)
-        fingerprint = self._fingerprint(messages, symptoms, alerts)
+        # Private ids are part of the key: marking something private after a summary was
+        # generated (the request often comes after the content) regenerates it.
+        fingerprint = (*self._fingerprint(messages, symptoms, alerts), private_ids)
         with self._lock:
             hit = self._cache.get(key)
         if (
@@ -155,9 +186,10 @@ class DailySummary:
             )
         except LLMError:
             logger.warning("daily summary LLM call failed; using a plain summary", exc_info=True)
-            text = fallback_summary(elder, messages, symptoms, alerts)
-            return SummaryResult(text, self._clock(), fallback=True)  # not cached: retry next time
-        result = SummaryResult(text.strip(), self._clock())
+            text = with_note(fallback_summary(elder, messages, symptoms, alerts), note)
+            # not cached: retry next time
+            return SummaryResult(text, self._clock(), fallback=True, has_private=bool(note))
+        result = SummaryResult(with_note(text.strip(), note), self._clock(), has_private=bool(note))
         with self._lock:
             self._cache[key] = (fingerprint, result)
         return result

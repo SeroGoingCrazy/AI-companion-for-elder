@@ -1,4 +1,6 @@
-"""Family dashboard data: symptom timeline and conversation history (spec 5.5)."""
+"""Family dashboard data: symptom timeline and conversation history (spec 5.5).
+
+Every read goes through `privacy` (spec 3.9)."""
 
 from __future__ import annotations
 
@@ -7,10 +9,11 @@ from datetime import date, datetime
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict
 
-from elder_companion.dashboard import recent_messages, symptom_timeline
+from elder_companion.dashboard import symptom_timeline
 from elder_companion.db import UtcDateTime
 from elder_companion.elders import ElderNotFound, get_elder
-from elder_companion.models import Elder, SymptomLog
+from elder_companion.models import Elder
+from elder_companion.privacy import SymptomView, history_page
 from elder_companion.symptoms.schema import Severity, Status, get_catalog
 from elder_companion.web.deps import SessionDep
 
@@ -35,7 +38,7 @@ class SymptomOut(BaseModel):
     last_seen: UtcDateTime
 
     @classmethod
-    def of(cls, row: SymptomLog) -> SymptomOut:
+    def of(cls, row: SymptomView) -> SymptomOut:
         catalog = get_catalog()
         d = catalog.get(row.canonical) if row.canonical in catalog else catalog.get("other")
         return cls(
@@ -73,7 +76,8 @@ class MessageOut(BaseModel):
 
     id: int
     role: str
-    text: str
+    text: str  # "" when private
+    private: bool = False
     created_at: UtcDateTime
 
 
@@ -97,7 +101,13 @@ def get_symptoms(
 ) -> TimelineOut:
     """Symptom log grouped by the elder's calendar day, newest day first (empty days included)."""
     elder = elder_or_404(session, elder_id)
-    groups = symptom_timeline(session, elder.id, elder_now(request), days)
+    groups = symptom_timeline(
+        session,
+        elder.id,
+        elder_now(request),
+        days,
+        request.app.state.settings.privacy.bypass_levels,
+    )
     return TimelineOut(
         timezone=request.app.state.settings.chat.timezone,
         days=[
@@ -114,11 +124,9 @@ def get_messages(
     before_id: int | None = Query(None, description="page back: messages older than this id"),
     elder_id: int | None = None,
 ) -> list[MessageOut]:
-    """Conversation history, oldest first."""
+    """Conversation history, oldest first; private messages are placeholders."""
     elder = elder_or_404(session, elder_id)
-    return [
-        MessageOut.model_validate(m) for m in recent_messages(session, elder.id, limit, before_id)
-    ]
+    return [MessageOut.model_validate(m) for m in history_page(session, elder.id, limit, before_id)]
 
 
 class SummaryOut(BaseModel):
@@ -126,6 +134,7 @@ class SummaryOut(BaseModel):
     generated_at: UtcDateTime
     fallback: bool
     empty: bool
+    has_private: bool = False
 
 
 @router.get("/summary/today", response_model=SummaryOut)
@@ -139,5 +148,9 @@ def get_today_summary(
     elder = elder_or_404(session, elder_id)
     r = request.app.state.daily_summary.get(session, elder.id, elder_now(request), refresh=refresh)
     return SummaryOut(
-        summary=r.summary, generated_at=r.generated_at, fallback=r.fallback, empty=r.empty
+        summary=r.summary,
+        generated_at=r.generated_at,
+        fallback=r.fallback,
+        empty=r.empty,
+        has_private=r.has_private,
     )

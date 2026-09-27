@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from sse_starlette import EventSourceResponse, ServerSentEvent
 
 from elder_companion.alerts.bus import StreamEvent
 from elder_companion.alerts.schemas import AlertIn, AlertOut
-from elder_companion.alerts.service import AlertNotFound, create_alert, list_alerts, mark_read
+from elder_companion.alerts.service import AlertNotFound, create_alert, mark_read
 from elder_companion.elders import ElderNotFound
+from elder_companion.models import DEFAULT_ELDER_ID
+from elder_companion.privacy import visible_alerts
 from elder_companion.web.deps import AlertBusDep, SessionDep
 
 router = APIRouter(prefix="/api/alerts", tags=["alerts"])
@@ -29,8 +31,13 @@ def post_alert(body: AlertIn, session: SessionDep, bus: AlertBusDep) -> AlertOut
 
 
 @router.get("", response_model=list[AlertOut])
-def get_alerts(session: SessionDep, limit: int = Query(50, ge=1, le=200)) -> list[AlertOut]:
-    return [AlertOut.model_validate(a) for a in list_alerts(session, limit=limit)]
+def get_alerts(
+    request: Request, session: SessionDep, limit: int = Query(50, ge=1, le=200)
+) -> list[AlertOut]:
+    """Newest first. Non-urgent symptom alerts from a private segment are left out."""
+    bypass = request.app.state.settings.privacy.bypass_levels
+    alerts = visible_alerts(session, DEFAULT_ELDER_ID, limit=limit, bypass_levels=bypass)
+    return [AlertOut.model_validate(a) for a in alerts]
 
 
 @router.post("/{alert_id}/read", response_model=AlertOut)

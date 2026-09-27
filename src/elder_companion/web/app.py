@@ -38,7 +38,9 @@ def create_app(settings: Settings | None = None, llm: BaseLLMClient | None = Non
     app.state.symptom_extractor = SymptomExtractor(app.state.llm)
     app.state.alert_bus = AlertBus()
     app.state.daily_summary = DailySummary(
-        app.state.llm, companion_name=settings.chat.companion_name
+        app.state.llm,
+        companion_name=settings.chat.companion_name,
+        bypass_levels=settings.privacy.bypass_levels,
     )
 
     app.include_router(alerts.router)
