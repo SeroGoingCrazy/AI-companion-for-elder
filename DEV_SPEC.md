@@ -3,6 +3,7 @@
 > Project: **Elder Companion Agent** (an AI companion agent for older adults living alone, plus a family care dashboard)
 > Version: v0.2 (adds companion memory, family loop, parent-controlled privacy, reports)
 > Timeline: 2-day core MVP + 1 day for Stage H; demo location: United States; model provider: OpenAI
+> Build note: Stage H ships without family reminders (H5) and without the daily digest / weekly report (H7); both are deferred (see the Stage H notes).
 > Team: **A (features / lead dev)** — backend, chat, voice, symptom log, family dashboard data; **B (vision / frontend)** — fall detection, UI polish, demo materials
 
 ## Table of Contents
@@ -105,7 +106,7 @@ Beyond health, the agent remembers the ordinary things a friend would: on Monday
 
 ### 2.6 Family Loop
 
-- **Medication / follow-up reminders**: a family member sets a reminder, either daily at a time or once on a date (e.g., "blood pressure pill, mornings", "ask if she booked the eye-doctor follow-up"). The agent brings it up naturally in the first session after it is due, and records the parent's answer as confirmed / declined / no response. The dashboard shows 7-day adherence. The agent only uses the family's wording and never comments on dose or medication choice.
+- **Medication / follow-up reminders** *(deferred: not built in this version, H5)*: a family member sets a reminder, either daily at a time or once on a date (e.g., "blood pressure pill, mornings", "ask if she booked the eye-doctor follow-up"). The agent brings it up naturally in the first session after it is due, and records the parent's answer as confirmed / declined / no response. The dashboard shows 7-day adherence. The agent only uses the family's wording and never comments on dose or medication choice.
 - **Sibling sharing**: several family members share one dashboard (switched with `?member=`), and everyone sees the same summaries. Any member can claim an alert or care-list item ("Ben: I'll call her doctor"), so it's visible who's handling what.
 - **Agenda budget**: each greeting carries at most 3 items, picked in this order: due reminders, then follow-ups. Items that don't fit carry over to the next session, so the opener never feels like a checklist.
 
@@ -119,7 +120,7 @@ Beyond health, the agent remembers the ordinary things a friend would: on Monday
 
 ### 2.8 Reports
 
-- **Weekly report**: one page covering the mood trend (a daily 1–5 score), the most-discussed topics, a symptom summary (what, how often, getting better or worse), and reminder adherence. It is built only from non-private data.
+- **Weekly report** *(deferred: not built in this version, H7)*: one page covering the mood trend (a daily 1–5 score), the most-discussed topics, a symptom summary (what, how often, getting better or worse), and reminder adherence. It is built only from non-private data.
 - **One-pager for the doctor**: a printable symptom log for the last N days. For each symptom it shows first/last seen, count, max severity, and status, with the parent's exact words and timestamps; it also lists red-flag alerts and reminder adherence. It is rendered from structured data by a template, with no LLM involved, so nothing can be invented.
 
 ### 2.9 Key Demo Metrics (to be filled in during Stage G)
@@ -130,10 +131,10 @@ Beyond health, the agent remembers the ordinary things a friend would: on Monday
 | Symptom-extraction eval accuracy (symptom name + red-flag) | ≥ 90% | – |
 | Red-flag recall (eval set) | 100% | – |
 | Demo-video fall detections / false positives | all detected / 0 false positives | demo clips: 2/2 main falls, 0/4 FP; all 17 URFD clips: 4/5 falls, 0/12 FP |
-| Memory-extraction eval accuracy (kind + subject) | ≥ 90% | – |
-| Privacy-request recall (eval set) | 100% | – |
-| Private text leaking into any family endpoint (leak test) | 0 | – |
-| Red flags inside private segments still alerted | 100% | – |
+| Memory-extraction eval accuracy (kind + subject) | ≥ 90% | – (eval set ready, not yet run against the API) |
+| Privacy-request recall (eval set) | 100% | – (same) |
+| Private text leaking into any family endpoint (leak test) | 0 | 0 across all 11 family GET routes/pages (offline leak test) |
+| Red flags inside private segments still alerted | 100% | 100% in tests (fall in English and Chinese private segments) |
 
 ---
 
@@ -434,14 +435,15 @@ message(id, elder_id, session_id, role[user|assistant], text, audio_path,
         private, created_at)
 symptom_log(id, elder_id, canonical, label, body_part, severity, duration, onset,
             status, raw_quote, message_id, count, first_seen, last_seen)
-symptom_mention(id, symptom_log_id, message_id, raw_quote, created_at)  -- one per occurrence
+symptom_mention(id, symptom_log_id, message_id, raw_quote, severity, created_at)  -- one per occurrence
 alert(id, elder_id, type[symptom|fall], level[high|medium], title, content,
-      snapshot_path, ref_id, created_at, is_read)
+      snapshot_path, ref_id, message_id, created_at, is_read)   -- message_id: source of a symptom alert
 
 -- Stage H
 memory_item(id, elder_id, kind[follow_up|person|topic|story], subject, text, raw_quote,
             message_id, private, mention_count, due_date, status[open|asked|expired],
-            first_seen, last_seen)
+            retelling, first_seen, last_seen)                    -- retelling: cached memoir text
+-- deferred (H5 / H7), not created in this version:
 reminder(id, elder_id, from_member_id, text,
          schedule_time, schedule_date, active, created_at)     -- daily HH:MM or one-off date
 reminder_log(id, reminder_id, date, status[mentioned|confirmed|declined|no_response], message_id)
@@ -681,16 +683,17 @@ elder_companion.family_agent (E5) ──▶ accesses fall data only through the 
 | GET | `/api/messages?limit=` | Conversation history (private messages → `{"private": true}` placeholder) | A |
 | GET | `/api/symptoms?days=7` | Symptom log (grouped by day; visible occurrences only) | A |
 | GET | `/api/family/members` | `[{id, name, relation}]` | A |
-| POST | `/api/reminders` | `{from_member_id, text, schedule_time?, schedule_date?}` → reminder | A |
-| GET | `/api/reminders` | Reminders with 7-day adherence | A |
-| DELETE | `/api/reminders/{id}` | Deactivate a reminder | A |
+| POST | `/api/reminders` | *(deferred, H5)* `{from_member_id, text, schedule_time?, schedule_date?}` → reminder | A |
+| GET | `/api/reminders` | *(deferred, H5)* Reminders with 7-day adherence | A |
+| DELETE | `/api/reminders/{id}` | *(deferred, H5)* Deactivate a reminder | A |
 | GET | `/api/care-list` | Visible `person \| topic` items, ≥ threshold mentions | A |
+| GET | `/api/claims` | Claims, newest first, with `member_name` and `done_at` | A |
 | POST | `/api/claims` | `{target_type, target_id, member_id, note}` → claim | A |
 | POST | `/api/claims/{id}/done` | Mark handled | A |
-| GET | `/family/report/weekly?week=` | Weekly report page (printable) | A (B: styling) |
+| GET | `/family/report/weekly?week=` | *(deferred, H7)* Weekly report page (printable) | A (B: styling) |
 | GET | `/family/doctor?days=30` | Doctor one-pager page (printable, no LLM) | A (B: styling) |
 | GET | `/family/memoir` | Memoir page | A (B: styling) |
-| GET | `/api/summary/today` | `{summary, generated_at}` | A |
+| GET | `/api/summary/today` | `{summary, generated_at, fallback, empty, has_private}` | A |
 | GET | `/api/alerts` | Alert list | A |
 | POST | `/api/alerts` | **Called by the fall service (the only cross-process contract, frozen on D1 morning)** | A |
 | POST | `/api/alerts/{id}/read` | Mark as read | A |
@@ -796,12 +799,12 @@ fall:
 | D | D1 D2 D3 D4 | ✅✅✅✅ |
 | E | E1 E2 E3 E4 E5* | ✅✅✅✅⬜ |
 | F | F1 F2 F3 F4 F5 F6 F7 F8 F9* | ✅✅✅✅✅✅✅✅⬜ |
-| H | H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 | ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ |
+| H | H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 | ✅✅✅✅⏸✅⏸✅✅✅ |
 | G | G1 G2 G3 G4 | ✅⬜⬜⬜ |
 
 ### 📈 Overall Progress
 
-`26 / 41` (* = optional task, not required for delivery)
+`34 / 41` (* = optional task, not required for delivery; ⏸ = deferred: H5 reminders and H7 digest / weekly report are out of scope for this build)
 
 ---
 
@@ -1050,30 +1053,33 @@ fall:
 
 > Design: 2.5–2.8, 3.7–3.10. Priority tag after each title: P0 must ship, P1 next, P2 cut first.
 
-### H1 (P0): Data model for memory, family loop, and privacy
+### H1 (P0): Data model for memory, family loop, and privacy ✅
 - **Owner**: A
 - **Goal**: add the Stage H tables from 3.12 (`family_member`, `chat_session`, `symptom_mention`, `memory_item`, `reminder`, `reminder_log`, `daily_digest`, `claim`) and the columns `message.private`, `message.session_id`, `elder.privacy_disclosed_at`. D3's merge now also writes one `symptom_mention` per occurrence. Seed two family members (Amy, Ben). With `--with-history`, also seed an orchid follow-up due today, a neighbor mentioned 3 times, two stories, and one private segment.
 - **Files**: `models.py`, `seed.py`, `symptoms/merge.py`, `tests/unit/test_models_stage_h.py`.
 - **Acceptance**: `seed --reset --with-history` runs cleanly; every symptom occurrence has a `symptom_mention` row; existing D/E tests still pass.
 - **How to test**: `uv run pytest -q tests/unit/test_models_stage_h.py tests/unit/test_symptom_merge.py`.
+- **Notes**: `reminder`, `reminder_log` and `daily_digest` are not created (H5 / H7 deferred). `init_db` adds missing columns to an existing sqlite file (`ALTER TABLE ADD COLUMN`), so a v0.1 `data/app.db` keeps working. The demo daughter is now Amy (was Emily in v0.1 seed text); seeded history also has one chat session per day and counts the privacy rule as already disclosed. Neighbor is Rosa (not Linda), so the demo's private "Linda" never collides with the care list.
 
-### H2 (P0): Companion memory extractor
+### H2 (P0): Companion memory extractor ✅
 - **Owner**: A
 - **Goal**: `extract_memory.txt` (kinds, "health complaints are not memory", verbatim `raw_quote`, privacy-request detection in English and Chinese, reminder acks, family replies, few-shots). Strict schema and merge rules from 3.7. Runs in the same `BackgroundTask` as symptom extraction, and a failure in one never affects the other.
 - **Files**: `config/prompts/extract_memory.txt`, `memory/schema.py`, `memory/extractor.py`, `memory/store.py`, `eval/memory_cases.yaml`, `eval/run_memory_eval.py`, `tests/unit/test_memory_merge.py`.
 - **Classes/functions**: `MemoryExtraction`, `MemoryExtractor.extract(user_text, recent_turns, session_agenda)`, `merge_memory_item(existing, item, now) -> MergeResult`, `process_message_memory(message_id)`.
 - **Acceptance**: "I'm going to repot my orchid this week" → `follow_up(subject=orchid)` with a due date ≤ 7 days; health complaints yield no items; L2 memory eval ≥ 90% with privacy-request recall 100%.
-- **How to test**: `uv run pytest -q tests/unit/test_memory_merge.py`; `uv run python eval/run_memory_eval.py`.
+- **How to test**: `uv run pytest -q tests/unit/test_memory_merge.py tests/integration/test_memory_pipeline.py`; `uv run python eval/run_memory_eval.py`.
+- **Notes**: no `reminder_acks` (H5 deferred). Runs after the symptom pipeline in one background task (`pipeline.process_elder_message`); the dashboard's `activity` event is published after both. Stories merge only on identical words (each story is its own keepsake). A private mention never merges into a visible item (it gets a private twin), so private words never overwrite visible ones; a follow-up already asked reopens only for an explicit new date. A privacy request also hides the companion's reply to each covered message. The L2 memory eval (25 cases) has not been run against the API yet (no key on the build machine).
 
-### H3 (P0): Agenda and follow-ups in the conversation
+### H3 (P0): Agenda and follow-ups in the conversation ✅
 - **Owner**: A
 - **Goal**: `select_agenda` (3.8, pure function), greeting delivery and marking, and `build_context` extended with companion memory (private items tagged never-relay). Update `greet.txt` / `companion.txt` with reminder-style few-shots and the rule "no medication content, never speak as the family member". Reminder acks → `reminder_log`; end-of-day `no_response`.
 - **Files**: `agenda/select.py`, `agenda/service.py`, `chat/context.py`, `chat/service.py`, `config/prompts/greet.txt`, `config/prompts/companion.txt`, `tests/unit/test_agenda_select.py`, `tests/integration/test_agenda_flow.py`.
 - **Classes/functions**: `AgendaItem`, `select_agenda(reminders, follow_ups, now, budget) -> list[AgendaItem]`, `AgendaService.mark_carried(items, greet_message_id)`.
 - **Acceptance**: the seeded orchid follow-up → the greeting asks about the orchid, and it is not asked again next session. With 3 due reminders + 1 follow-up pending, the greeting carries 3 items in priority order and the rest carry over. "Yes, I took it after breakfast" → `reminder_log.status = confirmed`.
 - **How to test**: `uv run pytest -q tests/unit/test_agenda_select.py tests/integration/test_agenda_flow.py` (mock LLM).
+- **Notes**: the agenda holds follow-ups only (reminders deferred); `AgendaItem.kind` leaves room for them ahead of follow-ups. `select_agenda(follow_ups, today, budget)`; `AgendaService.mark_carried(items)` runs only when the model's greeting (not the canned fallback) went out. Because replies ask one question, item 1 is the greeting's question and the rest stay in the companion's memory context for later in the chat.
 
-### H4 (P0): Parent-controlled privacy
+### H4 (P0): Parent-controlled privacy ✅
 - **Owner**: A
 - **Goal**: implement 3.9: span clamping, `mark_private` with cache invalidation, the `visible_*` read layer, and retrofitting every family-facing read to use it (E1 endpoints, E2 summary, E5 local tools, history redaction). Add the private-day note to the summary, the first-session disclosure in the greeting, and the in-the-moment disclosure in `companion.txt`.
 - **Files**: `privacy.py`, `memory/extractor.py`, `web/routes/family.py`, `summary.py`, `family_agent.py`, `config/prompts/companion.txt`, `config/prompts/greet.txt`, `tests/unit/test_privacy_filter.py`, `tests/integration/test_privacy_leak.py`.
@@ -1083,48 +1089,54 @@ fall:
   - "Keep this between us, but I fell in the kitchen yesterday" → the high `fall` alert still fires with the quote.
   - The first-ever greeting contains the disclosure.
 - **How to test**: `uv run pytest -q tests/unit/test_privacy_filter.py tests/integration/test_privacy_leak.py`.
+- **Notes**: E5 is not built, so there is no `family_agent.py` to retrofit. Summary invalidation needs no hook: the cache key includes today's private message ids. Non-urgent symptom alerts raised by a private message are hidden via `alert.message_id`; one pushed live over SSE before a later "keep that between us" can still flash on an open dashboard until its next reload. A visible care-list item whose latest mention is marked private later loses that quote (text falls back to the subject).
 
-### H5 (P0): Reminders on the dashboard
+### H5 (P0): Reminders on the dashboard ⏸ deferred
+> Not built in this version (decided during Stage H). The agenda, doctor one-pager and demo script run without reminders.
 - **Owner**: A (endpoints) / B (UI)
 - **Goal**: `/api/reminders` endpoints (5.5). Dashboard panel: add a reminder (text + daily time or date); list with 7-day adherence dots; deactivate a reminder. The acting member defaults to the first family member (the switcher comes in H9).
 - **Files**: `family_loop/reminders.py`, `web/routes/family.py`, `web/templates/family.html`, `web/static/family.js`, `tests/integration/test_reminders_api.py`.
 - **Acceptance**: Amy adds "blood pressure pill, 8:00" → the next elder greeting after 8:00 checks on it → the parent says "yes, took it" → after a refresh the dashboard shows today as confirmed.
 - **How to test**: `uv run pytest -q tests/integration/test_reminders_api.py`; manual (two windows).
 
-### H6 (P1): Doctor one-pager
+### H6 (P1): Doctor one-pager ✅
 - **Owner**: A (query) / B (template, print CSS)
 - **Goal**: `/family/doctor?days=30` per 3.10: per-symptom table + exact quotes with timestamps from visible `symptom_mention`s, red-flag alerts, reminder adherence, disclaimer; a "Print / Save as PDF" button.
 - **Files**: `reports/doctor.py`, `web/routes/reports.py`, `web/templates/doctor.html`, `web/static/style.css`, `tests/unit/test_doctor_report.py`.
 - **Acceptance**: prints to ≤ 2 Letter pages; every quote matches a stored `raw_quote`; private non-red-flag symptoms are absent; it makes no LLM call (the test uses a client that raises).
 - **How to test**: `uv run pytest -q tests/unit/test_doctor_report.py`; manual print preview.
+- **Notes**: no reminder-adherence section (H5 deferred). Log rows of the same symptom are combined into one line; the 4 most recent quotes are shown with a count of earlier ones, which keeps the page short.
 
-### H7 (P1): Daily digest and weekly report
+### H7 (P1): Daily digest and weekly report ⏸ deferred
+> Not built in this version (decided during Stage H). E2's summary keeps its own cache and now reads through `privacy.py`, with the private-day note added in code.
 - **Owner**: A (B: styling)
 - **Goal**: `daily_summary.txt` → structured `{summary, mood_score, topics}` stored in `daily_digest` (3.10), with E2 reading from it. Weekly report page: mood line, top topics, symptom counts and trend, reminder adherence, and a 2–3 sentence overview.
 - **Files**: `reports/digest.py`, `reports/weekly.py`, `summary.py`, `config/prompts/daily_summary.txt`, `config/prompts/weekly_report.txt`, `web/templates/report_weekly.html`, `tests/unit/test_weekly_aggregate.py`.
 - **Acceptance**: with seeded history the report shows 7 mood points, the top 3 topics, symptom trends, and adherence; days with private segments carry the private note and no private content.
 - **How to test**: `uv run pytest -q tests/unit/test_weekly_aggregate.py` (mock digests); manual view.
 
-### H8 (P1): Care list
+### H8 (P1): Care list ✅
 - **Owner**: A
 - **Goal**: `/api/care-list` + a dashboard card: visible `person | topic` items with ≥ `care_list_min_mentions`, count, last mention, and latest quote.
 - **Files**: `memory/care_list.py`, `web/routes/family.py`, `web/templates/family.html`, `web/static/family.js`, `tests/unit/test_care_list.py`.
 - **Acceptance**: the seeded neighbor (3 mentions) appears; single mentions and private items don't.
 - **How to test**: `uv run pytest -q tests/unit/test_care_list.py`.
 
-### H9 (P2): Sibling sharing and claims
+### H9 (P2): Sibling sharing and claims ✅
 - **Owner**: A (endpoints) / B (UI)
 - **Goal**: a member switcher (`/family?member=<id>`, remembered in `localStorage`); `/api/claims` endpoints; a "I'll handle this" button with a note on alerts and care-list items; "Ben is handling this" badges; mark done.
 - **Files**: `family_loop/claims.py`, `web/routes/family.py`, `web/templates/family.html`, `web/static/family.js`, `tests/integration/test_claims_api.py`.
 - **Acceptance**: Ben claims the chest-tightness alert with "I'll call her doctor" → Amy's view shows the badge; after marking it done the badge shows as handled.
 - **How to test**: `uv run pytest -q tests/integration/test_claims_api.py`; manual with two browser windows.
+- **Notes**: `?member=` accepts an id or a name (`?member=ben`). Also `GET /api/claims`. Verified in the browser: Ben's claim shows as "Ben is handling this: “I'll call her doctor”" in Amy's view.
 
-### H10 (P2): Family memoir
+### H10 (P2): Family memoir ✅
 - **Owner**: A (backend) / B (page)
 - **Goal**: `/family/memoir` per 3.10: visible stories in chronological order, the verbatim excerpt next to a cached retelling (`memoir.txt`, which must not add facts).
 - **Files**: `reports/memoir.py`, `config/prompts/memoir.txt`, `web/routes/reports.py`, `web/templates/memoir.html`.
 - **Acceptance**: the seeded stories appear with their excerpts; private stories are absent; a second load makes no LLM calls (cache).
-- **How to test**: manual; mock unit test for the cache.
+- **How to test**: `uv run pytest -q tests/unit/test_memoir.py`; manual.
+- **Notes**: the retelling is cached on `memory_item.retelling`; if the model is down the page shows her words and retries on the next load.
 
 ---
 
@@ -1162,18 +1174,16 @@ fall:
 
 | # | Action | Expected |
 |---|---|---|
-| 0 | Dashboard as Amy: add reminder "blood pressure pill" (mornings) | Listed with empty adherence for today |
-| 1 | Open the elder app and tap "Start chatting" | AI greets by time of day, asks how the orchid repotting went (seed), and checks on the pill |
-| 2 | Elder: "Yes, took it after breakfast." | Reminder `confirmed` in today's adherence |
-| 3 | Elder: "My knee's much better, but I didn't sleep well last night." | AI asks about sleep; `insomnia` is added on the dashboard |
-| 4 | Elder: "这两天早上起来头有点晕" ("I've been a bit dizzy in the mornings these past two days") | AI asks for details; `dizziness` appears on the dashboard timeline |
-| 5 | Elder: "My friend Linda got bad news from her doctor. Keep this between us, okay?" | AI agrees and gives the short safety disclosure; nothing about Linda anywhere on the dashboard |
-| 6 | Elder: "My chest feels tight and I can't catch my breath" | AI reassures and suggests contacting family / 911; a **high** alert pops up on the dashboard |
-| 7 | Switch to the dashboard and play the fall video | Detection view shows FALLING → DOWN; fall alert + snapshot pops up |
-| 8 | Refresh today's summary on the dashboard | Summary covers sleep, dizziness, and the chest-tightness alert, plus "asked to keep part of today's conversation private" |
-| 9 | Switch to Ben (`?member=ben`), claim the chest alert: "I'll call her doctor"; open the doctor one-pager and weekly report | Amy's view shows "Ben is handling this"; one-pager lists symptoms with exact words; weekly mood trend |
-| 10 | Dashboard "Ask AI": "Did Mom fall today? Anything else I should know?" (E5) | Answer cites the fall time + symptoms (no Linda); tool_calls are shown |
-| 11 | Switch to Claude Desktop and ask the same question (F8) | Returns events and snapshots via fall-mcp — showing the capability is reusable |
+| 1 | Open the elder app and tap "Start chatting" | AI greets by time of day and asks how the orchid repotting went (seed) |
+| 2 | Elder: "My knee's much better, but I didn't sleep well last night." | AI asks about sleep; `insomnia` is added on the dashboard |
+| 3 | Elder: "这两天早上起来头有点晕" ("I've been a bit dizzy in the mornings these past two days") | AI asks for details; `dizziness` appears on the dashboard timeline |
+| 4 | Elder: "My friend Linda got bad news from her doctor. Keep this between us, okay?" | AI agrees and gives the short safety disclosure; nothing about Linda anywhere on the dashboard |
+| 5 | Elder: "My chest feels tight and I can't catch my breath" | AI reassures and suggests contacting family / 911; a **high** alert pops up on the dashboard |
+| 6 | Switch to the dashboard and play the fall video | Detection view shows FALLING → DOWN; fall alert + snapshot pops up |
+| 7 | Refresh today's summary on the dashboard | Summary covers sleep, dizziness, and the chest-tightness alert, plus "asked to keep part of today's conversation private" |
+| 8 | Switch to Ben (`?member=ben`), claim the chest alert: "I'll call her doctor"; open the doctor one-pager and Maggie's stories | Amy's view shows "Ben is handling this"; one-pager lists symptoms with exact words; memoir shows her teaching story |
+| 9 | Dashboard "Ask AI": "Did Mom fall today? Anything else I should know?" (E5) | Answer cites the fall time + symptoms (no Linda); tool_calls are shown |
+| 10 | Switch to Claude Desktop and ask the same question (F8) | Returns events and snapshots via fall-mcp — showing the capability is reusable |
 
 ### Delivery Milestones
 
@@ -1183,8 +1193,8 @@ fall:
 | M1 | A–D | D1 evening | Voice chat + symptom log + red-flag alerts (SSE) |
 | M2 | E, F1–F6 | D2 morning | Complete dashboard + fall alerts |
 | M3 | F7–F8 (+E5) | D2 midday | fall-mcp called from Inspector / Claude Desktop; (optional) dashboard Q&A agent |
-| M4 | H1–H5 | D3 midday | Orchid follow-up, reminders, privacy with red-flag bypass |
-| Delivery | G (+ H6–H10) | D3 evening | Polished UI + reports + demo script + fallbacks |
+| M4 | H1–H4 (H5 deferred) | D3 midday | Orchid follow-up, privacy with red-flag bypass |
+| Delivery | G (+ H6, H8–H10; H7 deferred) | D3 evening | Polished UI + doctor one-pager + memoir + demo script + fallbacks |
 
 ---
 
@@ -1197,6 +1207,7 @@ fall:
 - **Telephony**: daily outbound calls and a parent-initiated callback number (e.g., Twilio) on the same chat / extraction / agenda pipeline, for parents who won't open an app.
 - **Scam alert**: flag mentions of a stranger's call, a money transfer, or a prize — common phone scams against elders — as a new alert type.
 - **Family ↔ parent messages**: a family member leaves a message, the agent passes it on in its own voice (no voice cloning), and the parent's answer is carried back.
+- **Family reminders and reports** (deferred from Stage H): reminders with adherence (H5) and the daily digest / weekly report (H7), as designed in 2.6, 2.8, 3.8 and 3.10.
 - **Reminder escalation**: notify the family when a reminder is declined or unanswered several days in a row.
 - **Cognitive and mood trends**: long-term tracking of loneliness, low mood, and repeated questions (an early sign of cognitive decline), building on the weekly report.
 - **Deeper long-term memory**: v1 keeps structured memory items (2.5); next is vector retrieval over all past conversations and preferences.
