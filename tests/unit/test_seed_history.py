@@ -77,7 +77,7 @@ def test_greeting_follows_up_on_yesterdays_knee(session: Session) -> None:
     )
     assert (recent[0].label, recent[0].status) == ("knee pain", "ongoing")
     elder = session.get(Elder, 1)
-    msgs = build_greet_context(elder, [], recent, NOW, companion_name="Sunny", history_turns=10)
+    msgs = build_greet_context(elder, [], recent, NOW, companion_name="Hallo", history_turns=10)
     assert "ask how her knee pain is doing" in msgs[-1]["content"]
 
 

@@ -114,4 +114,4 @@ def test_chat_timezone_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_PROVIDER", "mock")
     s = load_settings(load_env_file=False)
     assert s.chat.tz.key == "America/Los_Angeles"
-    assert s.chat.companion_name == "Sunny"
+    assert s.chat.companion_name == "Hallo"

@@ -726,7 +726,7 @@ llm:
   tts_instructions: "Speak slowly, warmly and clearly, like a caring family member."
   timeout_s: 15
 chat:
-  companion_name: ${COMPANION_NAME:-Sunny}
+  companion_name: ${COMPANION_NAME:-Hallo}
   timezone: ${ELDER_TIMEZONE:-America/Los_Angeles}   # elder's local time
   history_turns: 10
   max_reply_tokens: 150

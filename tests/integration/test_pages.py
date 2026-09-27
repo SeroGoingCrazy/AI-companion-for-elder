@@ -14,7 +14,7 @@ def test_elder_page_renders_persona_and_config(client: TestClient) -> None:
     r = client.get("/elder")
     assert r.status_code == 200
     html = r.text
-    assert "<title>Sunny</title>" in html
+    assert "<title>Hallo</title>" in html
     assert "Hello, Maggie!" in html
     assert 'id="mic-btn"' in html
     assert (

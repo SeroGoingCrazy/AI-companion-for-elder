@@ -58,7 +58,7 @@ class LLMSettings(_Model):
 
 
 class ChatSettings(_Model):
-    companion_name: str = "Sunny"
+    companion_name: str = "Hallo"
     timezone: str = "America/Los_Angeles"  # the elder's local time (greetings, "yesterday")
     history_turns: int = 10
     max_reply_tokens: int = 150

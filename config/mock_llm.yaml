@@ -7,7 +7,7 @@ chat:
   # Matched against the greeting instruction (session agenda, first-chat disclosure).
   greet_rules:
     - match: ["first chat together"]
-      reply: "Good morning, Maggie! I'm Sunny. I'll always ask you before I tell Amy anything personal, and what you want kept between us stays there, except your safety, like a fall or chest pain, which I'd always tell Amy about. How are you feeling today?"
+      reply: "Good morning, Maggie! I'm Hallo. I'll always ask you before I tell Amy anything personal, and what you want kept between us stays there, except your safety, like a fall or chest pain, which I'd always tell Amy about. How are you feeling today?"
     # Reminders outrank follow-ups in the agenda, so this rule comes before the orchid one.
     - match: ["asked you to check on this"]
       reply: "Good morning, Maggie! Amy asked me to check in about your blood pressure pill with breakfast. Have you had it yet?"
