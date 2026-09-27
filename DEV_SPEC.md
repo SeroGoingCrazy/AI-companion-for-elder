@@ -580,11 +580,11 @@ fall:
 | D | D1 D2 D3 D4 | ✅✅✅✅ |
 | E | E1 E2 E3 E4 E5* | ✅✅✅✅⬜ |
 | F | F1 F2 F3 F4 F5 F6 F7 F8 F9* | ✅✅✅✅✅✅✅✅⬜ |
-| G | G1 G2 G3 G4 | ✅⬜⬜⬜ |
+| G | G1 G2 G3 G4 G5 G6 | ✅⬜⬜⬜✅✅ |
 
 ### 📈 Overall Progress
 
-`26 / 31` (* = optional task, not required for delivery)
+`28 / 33` (* = optional task, not required for delivery)
 
 ---
 
@@ -858,6 +858,21 @@ fall:
 - **Files**: `DEV_SPEC.md` (final progress and metrics).
 - **Acceptance**: `uv run pytest -q` is all green; the 2.5 table is filled in; every task in the progress table is ✅.
 - **How to test**: `uv run pytest -q && uv run python eval/run_extraction_eval.py`.
+
+### G5: Installable app (PWA) ✅
+- **Owner**: A
+- **Goal**: make both surfaces installable to a phone home screen, each with its own name, icon and start URL, so the demo runs full screen with no browser chrome; precache the shell so the app still opens when venue wifi drops, while every live path stays on the network.
+- **Files**: `web/routes/pwa.py`, `web/static/sw.js`, `web/static/pwa.js`, `web/static/icons/*`, `scripts/make_icons.py`, both templates, `web/app.py`, `README.md`.
+- **Acceptance**: Chrome reports both pages installable; the worker claims scope `/`; no `/api/` or `/media/` response is ever cached; `/elder` still renders with the server stopped.
+- **How to test**: `uv run pytest tests/integration/test_pwa.py -q`; on a phone, open over HTTPS and use Add to Home Screen.
+- **Note**: a LAN address is not a secure context, so phones need an HTTPS tunnel (`cloudflared tunnel --url http://127.0.0.1:8000`, or `ssh -R 80:localhost:8000 nokey@localhost.run` where Cloudflare is blocked). `127.0.0.1` on the host machine installs directly.
+
+### G6: Reproducible demo screenshots ✅
+- **Owner**: A
+- **Goal**: replay the demo script against a running server and capture the pitch-deck shots, so they can be regenerated instead of retaken by hand whenever the UI moves.
+- **Files**: `scripts/demo_shots.py`, `demo/shots/*.png`.
+- **Acceptance**: one command produces the elder app at phone size and the dashboard at laptop size, including the urgent alert arriving live.
+- **How to test**: `uv run elder-web` then `uv run --with playwright python scripts/demo_shots.py`.
 
 ### Demo Script (draft)
 
