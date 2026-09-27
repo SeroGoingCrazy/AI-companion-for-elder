@@ -367,6 +367,10 @@ body.family {
 .fall-view img { width: 100%; height: 100%; object-fit: contain; }
 .fall-view img[hidden], .fall-offline[hidden] { display: none; }
 .fall-offline { margin: 0; padding: 0 16px; color: #b9c6d8; font-size: 14px; text-align: center; }
+.fall-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.fall-controls .btn[aria-pressed="true"] { background: #fff; color: var(--ink); border-color: #fff; }
+.fall-error { margin: 8px 0 0; color: #ffb4a8; font-size: 13px; }
+.fall-error[hidden] { display: none; }
 
 /* symptoms */
 .legend { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }

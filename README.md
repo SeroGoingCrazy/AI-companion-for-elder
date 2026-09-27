@@ -58,8 +58,9 @@ uv run python -m fall_detector.ctl play demo/videos/walk.mp4 --loop
 ```
 
 The dashboard's fall panel shows the live view (`:8001/stream`); a confirmed fall posts an alert with a
-snapshot to the dashboard. Use a camera with `--source 0` (or `FALL_SOURCE=0`); on Apple Silicon set
-`FALL_DEVICE=mps`. Check a single clip without the service:
+snapshot to the dashboard. The panel's **Camera / Demo video / Pause** buttons switch the source; Camera
+uses `FALL_CAMERA` (default `0`; on a Mac with Continuity Camera, `0` may be the iPhone, so try `1`).
+From the terminal: `--source 0` (or `FALL_SOURCE=0`). On Apple Silicon set `FALL_DEVICE=mps`. Check a single clip without the service:
 `uv run python -m fall_detector --source demo/videos/lie_down.mp4 --show`.
 
 MCP: Streamable HTTP at `http://127.0.0.1:8001/mcp`, or stdio for Claude Desktop — see

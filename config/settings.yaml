@@ -47,6 +47,7 @@ privacy:
 fall:
   model: ${FALL_MODEL:-models/yolo11n-pose.pt}   # fetched by scripts/fetch_demo_media.py
   device: ${FALL_DEVICE:-cpu}                    # cpu | mps (Apple Silicon) | 0 (CUDA)
+  camera: ${FALL_CAMERA:-0}                      # camera index the dashboard's Camera button uses
   min_keypoint_conf: 0.3                         # keypoints below this are ignored
   aspect_ratio_threshold: 1.2                    # bbox width / height above this = lying
   torso_angle_deg: 60                            # torso this far from vertical = lying

@@ -118,6 +118,12 @@
         <img id="fall-stream" alt="Live fall-detection view" hidden>
         <p id="fall-offline" class="fall-offline">Fall detection is offline.</p>
       </div>
+      <div class="fall-controls" role="group" aria-label="Fall-detection source">
+        <button type="button" class="btn btn-small btn-ghost-light" data-fall-mode="camera">Camera</button>
+        <button type="button" class="btn btn-small btn-ghost-light" data-fall-mode="demo">Demo video</button>
+        <button type="button" class="btn btn-small btn-ghost-light" data-fall-mode="stop">Pause</button>
+      </div>
+      <p id="fall-error" class="fall-error" role="alert" hidden></p>
     </section>
 
     <section class="card symptoms-card" aria-labelledby="symptoms-h">
