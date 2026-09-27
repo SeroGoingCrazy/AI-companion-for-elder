@@ -7,7 +7,8 @@ An AI companion agent for older adults living alone, plus a care dashboard for t
 - **Companion memory**: remembers small life details ("I'll repot my orchid this week") and asks about them in a later greeting.
 - **Parent-controlled privacy**: "keep this between us" hides that part from every family view, while the companion still remembers it; urgent safety alerts (a fall, chest pain) always go through, and the parent is told so up front.
 - **Family dashboard** (`/family`): daily summary, symptom timeline, alerts, live fall-detection view, "on her mind" care list, and sibling sharing (`?member=ben`, "I'll handle this").
-- **Reports**: a printable doctor one-pager (`/family/doctor`, built without an LLM) and a memoir of her stories (`/family/memoir`).
+- **Reminders**: family sets a reminder (a daily pill, a one-off "did you book the eye doctor?"); the companion raises it in her next chat, in the family's own wording, and her answer shows up on the dashboard as 7-day adherence. It never adds a dose or medical advice.
+- **Reports**: a printable weekly report (`/family/report/weekly`: mood trend, most-discussed topics, symptom trends and reminder adherence), a doctor one-pager (`/family/doctor`, built without an LLM) and a memoir of her stories (`/family/memoir`).
 - **fall-mcp**: YOLO11-pose fall detection exposed as an MCP server (usable from the dashboard agent, Claude Desktop, Cursor), with real-time push alerts.
 
 > This product does not provide medical diagnosis.

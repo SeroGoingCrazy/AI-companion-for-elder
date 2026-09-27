@@ -1,6 +1,6 @@
 """ORM models (spec 3.12): Elder / Message / SymptomLog / Alert + Stage H tables.
 
-Stage H without reminders and the daily digest (not built in this version).
+Stage H, with family reminders (H5). The daily digest is not built in this version.
 """
 
 from __future__ import annotations
@@ -181,6 +181,83 @@ class Claim(Base):
     note: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     done_at: Mapped[datetime | None] = mapped_column()
+
+
+REMINDER_STATUSES = ("mentioned", "confirmed", "declined", "no_response")
+
+
+class Reminder(Base):
+    """Something a family member wants the companion to bring up (spec 2.6, H5).
+
+    Either daily at `schedule_time` or once on `schedule_date`. `text` is the family's own
+    wording and is the only wording the companion uses: it never adds dose or medical advice.
+    """
+
+    __tablename__ = "reminder"
+    __table_args__ = (
+        CheckConstraint(
+            "(schedule_time IS NOT NULL) OR (schedule_date IS NOT NULL)",
+            name="ck_reminder_schedule",
+        ),
+        Index("ix_reminder_elder_active", "elder_id", "active"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    elder_id: Mapped[int] = mapped_column(ForeignKey("elder.id"))
+    from_member_id: Mapped[int | None] = mapped_column(ForeignKey("family_member.id"))
+    text: Mapped[str] = mapped_column(Text)
+    schedule_time: Mapped[str | None] = mapped_column(String(5))  # daily, "HH:MM" elder-local
+    schedule_date: Mapped[date | None] = mapped_column()  # one-off, the elder's local date
+    active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class ReminderLog(Base):
+    """One reminder on one of the elder's local days: was it raised, and what did she say."""
+
+    __tablename__ = "reminder_log"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('mentioned', 'confirmed', 'declined', 'no_response')",
+            name="ck_reminder_log_status",
+        ),
+        Index("ix_reminder_log_reminder_date", "reminder_id", "date", unique=True),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    reminder_id: Mapped[int] = mapped_column(ForeignKey("reminder.id"))
+    date: Mapped[date] = mapped_column()  # the elder's local date it was raised
+    status: Mapped[str] = mapped_column(String(20), default="mentioned")
+    message_id: Mapped[int | None] = mapped_column(ForeignKey("message.id"))  # her answer
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class DailyDigest(Base):
+    """One elder-local day, summarized once and kept (spec 3.10, H7).
+
+    Today's dashboard summary and the weekly report both read from here, so a day is
+    summarized once and the weekly page costs no extra model calls for days already seen.
+    `has_private` records that part of the day was held back, without storing any of it.
+    """
+
+    __tablename__ = "daily_digest"
+    __table_args__ = (
+        CheckConstraint(
+            "mood_score IS NULL OR (mood_score BETWEEN 1 AND 5)", name="ck_digest_mood"
+        ),
+        Index("ix_digest_elder_date", "elder_id", "date", unique=True),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    elder_id: Mapped[int] = mapped_column(ForeignKey("elder.id"))
+    date: Mapped[date] = mapped_column()  # the elder's local day
+    summary: Mapped[str] = mapped_column(Text, default="")
+    mood_score: Mapped[int | None] = mapped_column()  # 1 (low) to 5 (bright); None = no chat
+    topics_json: Mapped[str] = mapped_column(Text, default="[]")
+    has_private: Mapped[bool] = mapped_column(default=False, server_default=false())
+    fingerprint: Mapped[str] = mapped_column(String(64), default="")  # regenerate when it moves
+    generated_at: Mapped[datetime] = mapped_column(default=utcnow)
 
 
 CONSENT_DECISIONS = ("pending", "share", "private")

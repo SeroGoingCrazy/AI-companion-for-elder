@@ -165,20 +165,33 @@ def greeting_language(elder: Elder, history: Sequence[Message]) -> str:
     return detect_language(last_user.text) if last_user else (elder.language or "en")
 
 
+def agenda_line(index: int, item: AgendaItem) -> str:
+    """One numbered agenda line. A reminder is attributed to the family member who set it,
+    and is quoted as they wrote it (spec 2.6): the companion adds nothing to their wording."""
+    if item.kind == "reminder":
+        who = item.from_member_name or "Her family"
+        return f'{index}. {who} asked you to check on this: "{item.text}"'
+    return f"{index}. {item.subject}: {item.text}" + (f" {PRIVATE_TAG}" if item.private else "")
+
+
 def format_agenda(agenda: Sequence[AgendaItem]) -> str:
     if not agenda:
         return ""
-    lines = [
-        f"{i}. {a.subject}: {a.text}" + (f" {PRIVATE_TAG}" if a.private else "")
-        for i, a in enumerate(agenda, 1)
-    ]
-    return (
-        "\n\nFrom earlier chats, worth asking about today:\n"
-        + "\n".join(lines)
-        + "\nMake item 1 your one question, asked with friendly curiosity, not like a form. "
+    lines = [agenda_line(i, a) for i, a in enumerate(agenda, 1)]
+    has_reminder = any(a.kind == "reminder" for a in agenda)
+    rules = (
+        "\nMake item 1 your one question, asked with friendly curiosity, not like a form. "
         "The others can come up later in the chat if it feels natural. Never read them out "
         "as a list."
     )
+    if has_reminder:
+        rules += (
+            " For anything a family member asked you to check on, say who asked, use their "
+            "words as they wrote them, and add nothing of your own: no dose, no schedule she "
+            "was not given, and no opinion on whether she should take it. If she says she "
+            "already did it, just be warm about it and move on."
+        )
+    return "\n\nFrom earlier chats, worth asking about today:\n" + "\n".join(lines) + rules
 
 
 def build_greet_context(

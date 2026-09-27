@@ -236,7 +236,8 @@ body.family {
   display: grid;
   gap: 20px;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "header" "summary" "alerts" "care" "symptoms" "fall" "history" "footer";
+  grid-template-areas:
+    "header" "summary" "alerts" "reminders" "care" "symptoms" "fall" "history" "footer";
 }
 @media (min-width: 900px) {
   .dash {
@@ -247,19 +248,21 @@ body.family {
       "header header"
       "summary summary"
       "symptoms alerts"
+      "symptoms reminders"
       "symptoms care"
       "symptoms fall"
       "history history"
       "footer footer";
-    /* the symptoms column spans three rows: give its extra height to the fall row, so the
+    /* the symptoms column spans four rows: give its extra height to the fall row, so the
        cards on the right are not stretched away from each other */
-    grid-template-rows: auto auto auto auto 1fr auto auto;
+    grid-template-rows: auto auto auto auto auto 1fr auto auto;
     align-items: start;
   }
 }
 .dash-header { grid-area: header; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 .summary-card { grid-area: summary; }
 .alerts-card { grid-area: alerts; }
+.reminders-card { grid-area: reminders; }
 .fall-card { grid-area: fall; }
 .care-card { grid-area: care; }
 .symptoms-card { grid-area: symptoms; }
@@ -416,11 +419,120 @@ body.family {
 .history-msg.assistant { align-self: flex-start; background: #f7f9fb; }
 .history-text { margin: 0; overflow-wrap: anywhere; }
 
+/* ---------- reminders (H5) ---------- */
+
+.reminders-intro { margin: -4px 0 12px; }
+.reminders-note { margin: 10px 0 0; font-size: 12px; }
+.reminder-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.reminder-item {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: start;
+  padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px;
+}
+.reminder-item.is-off { opacity: 0.62; }
+.reminder-text { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
+.reminder-when-label { margin: 0; font-size: 13px; color: var(--muted); }
+.reminder-item .meta { grid-column: 1 / -1; }
+
+/* Adherence: one dot per day, oldest left. Shape as well as color, so the row still reads
+   for a color-blind child (and in a printed page). */
+.adherence { display: flex; gap: 5px; margin: 6px 0 0; padding: 0; list-style: none; grid-column: 1 / -1; }
+.dose {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--surface);
+  display: grid; place-items: center; font-size: 11px; font-weight: 800; line-height: 1;
+}
+.dose-confirmed { background: #e4f1e8; border-color: #7fb894; color: #1f5a33; }
+.dose-declined { background: var(--watch-bg); border-color: #e0b666; color: var(--watch); }
+.dose-no_response { background: var(--urgent-bg); border-color: #e39d95; color: var(--urgent); }
+.dose-none { color: var(--muted); }
+.adherence-summary { font-size: 13px; color: var(--muted); white-space: nowrap; }
+
+.reminder-form { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); display: grid; gap: 10px; }
+.reminder-form input[type="text"] {
+  min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--surface); color: var(--text); width: 100%;
+}
+.reminder-form input[type="text"]:focus-visible,
+.reminder-form input[type="time"]:focus-visible,
+.reminder-form input[type="date"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.reminder-when { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.reminder-radio { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); }
+.reminder-radio input[type="time"], .reminder-radio input[type="date"] {
+  min-height: 36px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface); color: var(--text); font-size: 14px;
+}
+.reminder-radio input:disabled { opacity: 0.5; }
+.reminder-form .btn-attention { justify-self: start; }
+.reminder-error { margin: 0; color: var(--urgent); font-size: 13px; font-weight: 700; }
+.reminder-error[hidden] { display: none; }
+
+/* ---------- weekly report (H7) ---------- */
+
+.report-overview {
+  font-size: 20px; line-height: 1.5; max-width: 62ch; text-wrap: pretty;
+  margin: 0 0 24px; padding-left: 14px; border-left: 4px solid var(--sun);
+}
+.report-section-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.week-nav { display: inline-flex; gap: 8px; }
+
+.mood-chart { width: 100%; height: auto; margin: 6px 0 2px; overflow: visible; }
+.mood-chart .grid { stroke: var(--line); stroke-width: 1; }
+.mood-chart .axis { fill: var(--muted); font-size: 12px; font-family: var(--font); }
+.mood-chart .axis-gap { fill: #aab6c6; font-size: 18px; }
+.mood-chart .mood-line { stroke: var(--sun); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+.mood-chart .mood-dot { fill: var(--sun); stroke: var(--ink); stroke-width: 2; }
+
+.topic-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.topic-row { display: grid; grid-template-columns: minmax(80px, 10ch) minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+.topic-name { font-weight: 700; overflow-wrap: anywhere; }
+.topic-bar { display: block; height: 14px; border-radius: 999px; background: #e7edf5; overflow: hidden; }
+.topic-fill { display: block; height: 100%; border-radius: 999px; background: var(--sun); min-width: 4px; }
+.topic-days { font-size: 13px; color: var(--muted); white-space: nowrap; }
+
+/* Direction reads as a word, not only a color, so it survives printing in grey. */
+.trend { font-weight: 700; font-size: 13px; }
+.trend-better { color: var(--ok); }
+.trend-better::before { content: "\2193 "; }
+.trend-worse { color: var(--urgent); }
+.trend-worse::before { content: "\2191 "; }
+.trend-same, .trend-new { color: var(--muted); }
+
+/* A 5-column table is unreadable on a phone, and the family reads this on a phone. Below
+   560px each row becomes a small card with its column names alongside the values. Scoped to
+   .table-stack so the doctor one-pager's table is untouched. Print always gets the table. */
+@media screen and (max-width: 560px) {
+  .table-stack, .table-stack tbody, .table-stack tr, .table-stack td { display: block; width: 100%; }
+  .table-stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .table-stack tr {
+    border: 1px solid var(--line); border-radius: 12px;
+    padding: 10px 12px; margin-bottom: 10px;
+  }
+  .table-stack td { border: 0; padding: 3px 0; }
+  .table-stack .cell-name { font-weight: 800; font-size: 17px; padding-bottom: 6px; }
+  .table-stack td[data-label] { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+  .table-stack td[data-label]::before {
+    content: attr(data-label); color: var(--muted); font-size: 13px; font-weight: 700;
+  }
+}
+
+.private-note { margin: 18px 0 0; padding-top: 12px; border-top: 1px solid var(--line); }
+
+@media print {
+  .week-nav { display: none; }
+  .mood-chart .mood-line { stroke: #6b4a00; }
+  .mood-chart .mood-dot { fill: #6b4a00; }
+  .topic-fill { background: #6b4a00; }
+}
+
 @media (max-width: 480px) {
   .dash-header h1 { font-size: 25px; }
   .summary-text { font-size: 20px; }
   .history-msg { max-width: 92%; }
   .alert-item { grid-template-columns: auto minmax(0, 1fr); }
+  .reminder-item { grid-template-columns: minmax(0, 1fr); }
+  .topic-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .topic-bar { grid-column: 1 / -1; }
+  .adherence-summary { grid-column: 1; }
   .alert-item > .btn { grid-column: 2; justify-self: start; }
 }
 

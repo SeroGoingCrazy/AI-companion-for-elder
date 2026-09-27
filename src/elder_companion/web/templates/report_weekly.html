@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Weekly report: {{ elder.name }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;700;800&display=swap">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="family report">
+  <main class="report-page">
+    <nav class="report-nav no-print">
+      <a href="/family">← Back to the dashboard</a>
+      <span class="week-nav">
+        <a class="btn btn-quiet" href="/family/report/weekly?week={{ week + 1 }}">← Earlier week</a>
+        {% if week > 0 %}<a class="btn btn-quiet" href="/family/report/weekly?week={{ week - 1 }}">Later week →</a>{% endif %}
+      </span>
+      <button type="button" class="btn btn-attention" onclick="window.print()">Print / Save as PDF</button>
+    </nav>
+
+    <header class="report-head">
+      <h1>{{ elder.nickname }}'s week</h1>
+      <p class="report-who"><strong>{{ elder.name }}</strong>
+        · {{ fmt_date(r.start) }} to {{ fmt_date(r.end) }}</p>
+    </header>
+
+    {% if not r.has_data %}
+    <p class="empty">{{ r.overview }}</p>
+    {% else %}
+
+    <p class="report-overview">{{ r.overview }}</p>
+
+    <section class="report-section" aria-labelledby="mood-h">
+      <div class="report-section-head">
+        <h2 id="mood-h">Mood</h2>
+        <p class="meta">
+          {% if r.average_mood is not none %}Averaged {{ r.average_mood }} out of 5,
+          <span class="trend trend-{{ r.mood_direction }}">{{ r.mood_direction }}</span> across the week ·{% endif %}
+          chatted on {{ r.chat_days }} of 7 days
+        </p>
+      </div>
+      {% set dots = mood_points(r.moods) %}
+      <svg class="mood-chart" viewBox="0 0 640 180" role="img"
+           aria-label="Mood from 1 to 5 for each day of the week">
+        {% for score in [1, 2, 3, 4, 5] %}
+          {% set y = 14 + (180 - 14 - 26) * (1 - (score - 1) / 4) %}
+          <line class="grid" x1="30" y1="{{ '%.1f'|format(y) }}" x2="610" y2="{{ '%.1f'|format(y) }}" />
+          <text class="axis" x="18" y="{{ '%.1f'|format(y + 4) }}" text-anchor="end">{{ score }}</text>
+        {% endfor %}
+        {% if dots|length > 1 %}
+        <polyline class="mood-line" points="{{ mood_path(r.moods) }}" fill="none" />
+        {% endif %}
+        {% for d in dots %}
+        <circle class="mood-dot" cx="{{ '%.1f'|format(d.x) }}" cy="{{ '%.1f'|format(d.y) }}" r="6">
+          <title>{{ d.label }}: {{ d.score }} out of 5</title>
+        </circle>
+        {% endfor %}
+        {% for m in r.moods %}
+          {% set x = 30 + (640 - 60) * loop.index0 / 6 %}
+          <text class="axis" x="{{ '%.1f'|format(x) }}" y="172" text-anchor="middle">{{ m.label }}</text>
+          {% if m.score is none %}
+          <text class="axis axis-gap" x="{{ '%.1f'|format(x) }}" y="{{ '%.1f'|format(14 + (180 - 40) / 2) }}" text-anchor="middle">·</text>
+          {% endif %}
+        {% endfor %}
+      </svg>
+      <p class="meta">A gap means she did not chat that day.</p>
+    </section>
+
+    <section class="report-section" aria-labelledby="topics-h">
+      <h2 id="topics-h">What she talked about</h2>
+      {% if r.topics %}
+      <ul class="topic-bars">
+        {% for t in r.topics %}
+        <li class="topic-row">
+          <span class="topic-name">{{ t.topic }}</span>
+          <span class="topic-bar" aria-hidden="true"><span class="topic-fill" style="width: {{ (100 * t.days / 7)|round|int }}%"></span></span>
+          <span class="topic-days">{{ t.days }} day{{ "" if t.days == 1 else "s" }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="empty">Nothing came up often enough to group.</p>
+      {% endif %}
+    </section>
+
+    <section class="report-section" aria-labelledby="sym-h">
+      <h2 id="sym-h">Symptoms this week</h2>
+      {% if r.symptoms %}
+      <table class="report-table table-stack">
+        <thead>
+          <tr>
+            <th scope="col">Symptom</th><th scope="col">Days</th><th scope="col">Times</th>
+            <th scope="col">Worst severity</th><th scope="col">Direction</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in r.symptoms %}
+          <tr>
+            <td class="cell-name">
+              {% if s.red_flag %}<span class="level-badge level-high">Urgent</span> {% endif %}{{ s.display }}
+              {% if s.label and s.label != s.display %}<span class="meta">{{ s.label }}</span>{% endif %}
+            </td>
+            <td data-label="Days">{{ s.days }}</td>
+            <td data-label="Times">{{ s.mentions }}</td>
+            <td data-label="Worst severity"><span class="chip sev-{{ 'red' if s.red_flag else s.max_severity }}">{{ "not stated" if s.max_severity == "unknown" else s.max_severity }}</span></td>
+            <td data-label="Direction"><span class="trend trend-{{ s.trend }}">{{ s.trend }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="empty">She mentioned nothing this week.</p>
+      {% endif %}
+    </section>
+
+    <section class="report-section" aria-labelledby="rem-h">
+      <h2 id="rem-h">Reminders</h2>
+      {% set asked = r.reminders | selectattr("raised_days") | list %}
+      {% if asked %}
+      <table class="report-table table-stack">
+        <thead>
+          <tr><th scope="col">Reminder</th><th scope="col">Set by</th><th scope="col">Days done</th><th scope="col">This week</th></tr>
+        </thead>
+        <tbody>
+          {% for rem in asked %}
+          <tr>
+            <td class="cell-name">{{ rem.text }}{% if not rem.active %} <span class="meta">off</span>{% endif %}</td>
+            <td data-label="Set by">{{ rem.from_member_name or "—" }}</td>
+            <td data-label="Days done">{{ rem.confirmed_days }} of {{ rem.raised_days }}</td>
+            <td data-label="This week">
+              <ul class="adherence">
+                {% for d in rem.history %}
+                <li class="dose dose-{{ d.status or 'none' }}">{{ {"confirmed": "✓", "declined": "–", "no_response": "?"}.get(d.status, "·") }}</li>
+                {% endfor %}
+              </ul>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="empty">No reminders were due this week.</p>
+      {% endif %}
+    </section>
+
+    {% if r.private_days %}
+    <p class="meta private-note">On {{ r.private_days }} day{{ "" if r.private_days == 1 else "s" }} this week, {{ elder.nickname }} asked to keep part of the conversation private. That part is not included here.</p>
+    {% endif %}
+    {% endif %}
+
+    <footer class="report-foot">
+      Written by AI from {{ elder.nickname }}'s chats and may be incomplete. Not medical advice.
+      Generated {{ fmt_date(r.generated_on) }}.
+    </footer>
+  </main>
+</body>
+</html>

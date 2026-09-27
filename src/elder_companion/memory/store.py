@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
@@ -12,11 +12,18 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from elder_companion.db import utcnow
+from elder_companion.family_loop import reminders as reminders_repo
 from elder_companion.llm import LLMError
-from elder_companion.memory.extractor import MemoryExtractor, Turn, normalize_subject
-from elder_companion.memory.schema import MemoryItemIn
-from elder_companion.models import MemoryItem, Message
+from elder_companion.memory.extractor import (
+    MemoryExtractor,
+    OpenReminder,
+    Turn,
+    normalize_subject,
+)
+from elder_companion.memory.schema import MemoryItemIn, ReminderAck
+from elder_companion.models import MemoryItem, Message, Reminder, ReminderLog
 from elder_companion.privacy import mark_private, privacy_span
+from elder_companion.reports.digest import invalidate
 from elder_companion.settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -116,6 +123,7 @@ def merge_memory_item(
 class MemoryResult:
     items: list[MemoryItem] = field(default_factory=list)  # rows inserted or updated
     marked_private: list[int] = field(default_factory=list)  # message ids
+    acked_reminders: list[int] = field(default_factory=list)  # reminder ids she answered
 
 
 class MemoryService:
@@ -137,8 +145,13 @@ class MemoryService:
         msg = self._session.get(Message, message_id)
         if msg is None or msg.role != "user":
             return result
-        extraction = self._extractor.extract(msg.id, msg.text, self._recent_turns(msg))
+        today = self._today()
+        open_logs = reminders_repo.open_logs(self._session, msg.elder_id, today)
+        extraction = self._extractor.extract(
+            msg.id, msg.text, self._recent_turns(msg), self._open_reminders(open_logs)
+        )
         now = self._now()
+        result.acked_reminders = self._apply_acks(extraction.reminder_acks, open_logs, msg.id)
 
         request = extraction.privacy_request
         if request.requested:
@@ -149,15 +162,56 @@ class MemoryService:
                 self._s.privacy.max_span_user_messages,
             )
             result.marked_private = covered
-            mark_private(self._session, with_replies(self._session, msg.elder_id, covered))
+            hidden = with_replies(self._session, msg.elder_id, covered)
+            mark_private(self._session, hidden)
+            # Those days were very likely already summarized with this content in them.
+            invalidate(self._session, msg.elder_id, self._local_days(hidden))
             self._session.flush()
             self._session.refresh(msg)
 
-        today = now.replace(tzinfo=UTC).astimezone(self._s.chat.tz).date()
         for item in extraction.items:
             result.items.append(self._merge(msg, item, now, today))
         self._session.commit()
         return result
+
+    def _local_days(self, message_ids: Sequence[int]) -> set[date]:
+        rows = self._session.scalars(select(Message).where(Message.id.in_(list(message_ids))))
+        tz = self._s.chat.tz
+        return {m.created_at.replace(tzinfo=UTC).astimezone(tz).date() for m in rows}
+
+    def _today(self) -> date:
+        """The elder's local date, from the same clock the rest of the service uses."""
+        return self._now().replace(tzinfo=UTC).astimezone(self._s.chat.tz).date()
+
+    def _open_reminders(self, logs: Sequence[ReminderLog]) -> list[OpenReminder]:
+        texts = (
+            {
+                r.id: r.text
+                for r in self._session.scalars(
+                    select(Reminder).where(Reminder.id.in_([log.reminder_id for log in logs]))
+                )
+            }
+            if logs
+            else {}
+        )
+        return [
+            OpenReminder(log.reminder_id, texts[log.reminder_id])
+            for log in logs
+            if log.reminder_id in texts
+        ]
+
+    def _apply_acks(
+        self, acks: Sequence[ReminderAck], logs: Sequence[ReminderLog], message_id: int
+    ) -> list[int]:
+        by_reminder = {log.reminder_id: log for log in logs}
+        applied = []
+        for ack in acks:
+            log = by_reminder.get(ack.reminder_id)
+            if log is None:
+                continue
+            reminders_repo.record_ack(self._session, log, ack.status, message_id)
+            applied.append(ack.reminder_id)
+        return applied
 
     def _merge(self, msg: Message, item: MemoryItemIn, now: datetime, today: date) -> MemoryItem:
         stmt = select(MemoryItem).where(

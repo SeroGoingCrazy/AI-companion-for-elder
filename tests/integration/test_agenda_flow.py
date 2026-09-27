@@ -11,7 +11,7 @@ from sqlalchemy import select
 from elder_companion.chat.context import PRIVATE_TAG
 from elder_companion.llm import LLMError
 from elder_companion.llm.mock import MockLLMClient
-from elder_companion.models import ChatSession, Elder, MemoryItem, Message
+from elder_companion.models import ChatSession, Elder, MemoryItem, Message, Reminder
 from elder_companion.seed import seed_history
 from elder_companion.settings import Settings
 from elder_companion.web.app import create_app
@@ -36,6 +36,16 @@ def _greet_instruction(llm: MockLLMClient) -> str:
 
 def _system_prompt(llm: MockLLMClient) -> str:
     return [args for name, args in llm.calls if name == "chat"][-1][0]["content"]
+
+
+def _no_reminders(c: TestClient) -> None:
+    """These tests are about follow-ups. The seeded pill reminder outranks them (spec 3.8)
+    and is due only after 08:00, which would make the ordering depend on the wall clock;
+    reminder priority has its own tests in test_reminders_api.py."""
+    with c.app.state.sessionmaker() as s:
+        for reminder in s.scalars(select(Reminder)):
+            reminder.active = False
+        s.commit()
 
 
 def _add_follow_ups(c: TestClient, subjects: list[str], today) -> None:  # noqa: ANN001
@@ -68,6 +78,7 @@ def test_first_greeting_discloses_the_privacy_rule_once(client: TestClient, llm)
 def test_seeded_orchid_is_asked_once(settings: Settings, client: TestClient, llm) -> None:  # noqa: ANN001
     with client.app.state.sessionmaker() as s:
         seed_history(s, datetime.now(settings.chat.tz))
+    _no_reminders(client)
     r = client.post("/api/chat/greet").json()
     assert "orchid" in r["reply_text"]
     assert "1. orchid" in _greet_instruction(llm)
@@ -84,6 +95,7 @@ def test_budget_of_three_in_priority_order_rest_carries_over(
     llm,  # noqa: ANN001
 ) -> None:
     today = datetime.now(settings.chat.tz).date()
+    _no_reminders(client)
     _add_follow_ups(client, ["eye doctor", "choir", "Leo's exam", "pie"], today)
     client.post("/api/chat/greet")
     instruction = _greet_instruction(llm)
@@ -99,6 +111,7 @@ def test_fallback_greeting_does_not_deliver_the_agenda(settings: Settings) -> No
             raise LLMError("down")
 
     with TestClient(create_app(settings, llm=DownLLM.from_config())) as c:
+        _no_reminders(c)
         _add_follow_ups(c, ["orchid"], datetime.now(settings.chat.tz).date())
         assert c.post("/api/chat/greet").json()["fallback"]
         with c.app.state.sessionmaker() as s:

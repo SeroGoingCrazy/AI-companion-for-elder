@@ -26,9 +26,12 @@ FAMILY_ENDPOINTS = (
     "/api/summary/today?refresh=true",
     "/api/alerts?limit=200",
     "/api/care-list",
+    "/api/reminders",
     "/api/claims",
     "/api/family/members",
     "/family/doctor?days=365",
+    "/family/report/weekly",
+    "/family/report/weekly?week=1",
     "/family/memoir",
 )
 
@@ -51,17 +54,39 @@ def _leaks(c: TestClient) -> dict[str, list[str]]:
     return found
 
 
+def _get_routes(app) -> set[str]:  # noqa: ANN001
+    """Every GET path in the app. FastAPI wraps an included router in `_IncludedRouter`,
+    which exposes neither `.path` nor `.routes`, so walk `original_router` as well: reading
+    only `app.routes` finds nothing and silently makes the check below pass."""
+    found = set()
+    stack = list(app.routes)
+    while stack:
+        route = stack.pop()
+        if inner := getattr(route, "original_router", None):
+            stack.extend(inner.routes)
+        if nested := getattr(route, "routes", None):
+            stack.extend(nested)
+        if "GET" in (getattr(route, "methods", None) or ()):
+            found.add(route.path)
+    return found
+
+
+def test_the_route_scan_finds_the_apps_routes(client: TestClient) -> None:
+    """Guards the guard: if this ever comes back empty, the check below means nothing."""
+    expected = {"/api/symptoms", "/api/reminders", "/family", "/family/report/weekly"}
+    assert expected <= _get_routes(client.app)
+
+
 def test_family_routes_are_all_scanned(client: TestClient) -> None:
     family_paths = {
-        route.path
-        for route in client.app.routes
-        if getattr(route, "methods", None)
-        and "GET" in route.methods
-        and (route.path.startswith("/family") or route.path.startswith("/api/"))
-        and not route.path.startswith(("/api/chat", "/api/tts", "/api/alerts/stream"))
+        path
+        for path in _get_routes(client.app)
+        if (path.startswith("/family") or path.startswith("/api/"))
+        and not path.startswith(("/api/chat", "/api/tts", "/api/alerts/stream"))
     }
     scanned = {p.split("?")[0] for p in FAMILY_ENDPOINTS}
-    assert family_paths <= scanned
+    missing = sorted(family_paths - scanned)
+    assert not missing, f"not scanned for private words: {missing}"
 
 
 def test_private_words_reach_no_family_view(client: TestClient) -> None:
