@@ -50,8 +50,11 @@ body {
 .alert-banner {
   position: sticky; top: 0; z-index: 10;
   display: flex; align-items: flex-start; gap: 14px;
-  /* A sibling of .dash, not a child, so it is already full-bleed: no negative margin. */
-  padding: 15px var(--gutter) 16px;
+  /* A sibling of .dash, not a child, so it is already full-bleed: no negative margin.
+     Installed to a home screen the page owns the whole display, so the banner has to
+     clear the status bar and the camera housing itself — otherwise the title sits under
+     the dynamic island. */
+  padding: calc(15px + env(safe-area-inset-top)) var(--gutter) 16px;
   background: var(--alarm); color: #fff;
 }
 .alert-banner-title { margin: 0; font-size: 19px; font-weight: 700; }

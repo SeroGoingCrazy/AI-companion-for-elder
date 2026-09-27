@@ -1,24 +1,75 @@
 # AI Companion for Elder
 
-An AI companion agent for older adults living alone, plus a care dashboard for their family.
+An AI companion for older adults living alone, and a care dashboard for their family.
+Two apps, one system: what she says on her phone reaches her family in seconds.
 
-- **Elder app** (`/elder`): voice-first chat companion — hold to talk, replies are read aloud.
-- **Symptom log**: symptoms mentioned in casual conversation are extracted automatically; red-flag symptoms alert the family in real time.
-- **Family dashboard** (`/family`): daily summary, symptom timeline, alerts, live fall-detection view.
-- **fall-mcp**: YOLO11-pose fall detection exposed as an MCP server (usable from the dashboard agent, Claude Desktop, Cursor), with real-time push alerts.
+![Sunny and Sunny Care](docs/images/hero.png)
+
+- **Elder app** (`/elder`): voice first. Hold the bar, talk, and Sunny answers out loud.
+- **Symptom log**: symptoms mentioned in ordinary conversation are extracted automatically;
+  red-flag symptoms alert the family at once.
+- **Family dashboard** (`/family`): today's summary, the alert stream, the live camera and
+  the transcript, on four tabs.
+- **fall-mcp**: YOLO11-pose fall detection, exposed as an MCP server so the dashboard, Claude
+  Desktop or Cursor can all use it, and pushing alerts with a snapshot in real time.
+
+Both surfaces install to a phone home screen, in English or Simplified Chinese.
 
 > This product does not provide medical diagnosis.
 
-See [DEV_SPEC.md](DEV_SPEC.md) for the full design and development plan.
+## Try it in two minutes
+
+Requires [uv](https://docs.astral.sh/uv/) and Python 3.12. No API key: the demo runs offline
+against canned replies, so a fresh clone works on a plane.
+
+```bash
+git clone <this repo> && cd ai-companion-for-elder
+./scripts/demo_up.sh
+```
+
+Then open <http://127.0.0.1:8000/elder> and <http://127.0.0.1:8000/family>, or add `?lang=zh`
+to either for Chinese. Ctrl-C stops everything.
+
+With real models instead of canned ones, put `OPENAI_API_KEY` in `.env` and run
+`./scripts/demo_up.sh --openai`.
+
+Fall detection joins in automatically once its model and clips are on disk:
+
+```bash
+uv sync --extra vision
+uv run --extra vision python scripts/fetch_demo_media.py
+```
+
+## The two apps
+
+![The elder's app](docs/images/elder-app.png)
+
+The elder surface is deliberately one screen with one control. Body type is 23px, the talk
+bar is 84px tall and every colour pair clears 4.5:1 — above the floors in WeChat's Care Mode
+spec and the MIIT accessibility standard. The talk control is a bar rather than a disc
+because that is the shape this audience already knows from voice messages.
+
+![The family's app](docs/images/family-app.png)
+
+The family surface answers four questions in four tabs: how is she, what happened, let me
+look, what did she say. An urgent alert jumps to Alerts on arrival and badges the tab.
+
+![The dashboard on a laptop](docs/images/dashboard-laptop.png)
 
 ## Quick start
 
-Requires [uv](https://docs.astral.sh/uv/) and Python 3.12.
+Run the tests, which are all offline:
 
 ```bash
 uv sync
-cp .env.example .env   # then set OPENAI_API_KEY
 uv run pytest -q
+```
+
+Start the two services by hand instead of through `demo_up.sh`:
+
+```bash
+uv run elder-web                                            # :8000
+uv run --extra vision python -m fall_detector.server        # :8001
 ```
 
 ## Languages

@@ -845,10 +845,11 @@ fall:
 - **Acceptance**: the full demo is ≤ 5 minutes and every step has a fallback.
 - **How to test**: rehearsal.
 
-### G3: One-command startup and README
+### G3: One-command startup and README ✅
 - **Owner**: A
-- **Goal**: `scripts/dev_up.ps1`: init DB + seed → start web → start fall_detector; the README clearly covers environment, `.env`, startup, and demo URLs.
-- **Files**: `scripts/dev_up.ps1`, `README.md`.
+- **Goal**: one command brings the whole demo up; the README shows what it is before asking anyone to run anything.
+- **Files**: `scripts/demo_up.sh`, `README.md`, `docs/images/*`.
+- **Note**: written as `demo_up.sh` rather than the planned `dev_up.ps1` — the team is on macOS. It defaults to `LLM_PROVIDER=mock` so a fresh clone needs no API key, brings up fall-mcp only when its model is on disk, and stops both services on Ctrl-C.
 - **Acceptance**: a fresh clone runs within 10 minutes by following the README.
 - **How to test**: run it from scratch on the teammate's machine.
 
