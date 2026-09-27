@@ -1,0 +1,15 @@
+#EXTM3U
+# The dashboard's "Demo video": every scenario in turn, looped. fall_03 is left out on purpose
+# (known miss: the body on the floor is mostly out of frame, see README.md).
+#EXTINF:-1,Walking (no alert)
+walk.mp4
+#EXTINF:-1,Fall sideways (alert)
+fall_01.mp4
+#EXTINF:-1,Sitting down (no alert)
+sit.mp4
+#EXTINF:-1,Lying down slowly (no alert)
+lie_down.mp4
+#EXTINF:-1,Fall from a chair (alert)
+fall_02.mp4
+#EXTINF:-1,Crouching (no alert)
+crouch.mp4

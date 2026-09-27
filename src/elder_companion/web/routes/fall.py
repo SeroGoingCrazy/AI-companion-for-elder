@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/fall", tags=["fall"])
 
-DEFAULT_DEMO_SOURCE = "demo/videos/walk.mp4"
+DEMO_PLAYLIST = "demo/videos/demo.m3u"  # every scenario in turn
 START_TIMEOUT_S = 30  # opening a camera the first time can wait on the OS permission prompt
 
 
@@ -46,12 +46,11 @@ async def fall_status(request: Request) -> JSONResponse:
 
 @router.post("/source")
 async def set_source(body: SourceIn, request: Request) -> JSONResponse:
-    """camera = the computer's camera (fall.camera index); demo = the looped demo clip."""
+    """camera = the computer's camera (fall.camera index); demo = the looped demo playlist."""
     base = _control_url(request)
     if body.mode == "stop":
         return await _forward("POST", f"{base}/stop")
-    fall = request.app.state.settings.fall
-    source = str(fall.camera) if body.mode == "camera" else (
-        fall.mcp.autostart_source or DEFAULT_DEMO_SOURCE)
+    camera = request.app.state.settings.fall.camera
+    source = str(camera) if body.mode == "camera" else DEMO_PLAYLIST
     return await _forward("POST", f"{base}/start", json={"source": source, "loop": True},
                           timeout=START_TIMEOUT_S)

@@ -32,6 +32,7 @@ class MonitorStatus:
     source: str | None = None
     loop: bool = False
     live: bool = False               # camera
+    clip: str | None = None          # playlist: the scenario playing now, e.g. "2/6 Fall"
     fps: float = 0.0
     persons: int = 0
     states: dict[int, str] = field(default_factory=dict)
@@ -162,7 +163,9 @@ class MonitorController:
                 alarm = any(s in (DOWN, FALLING) for s in states.values())
                 label = "FALL DETECTED" if DOWN in states.values() else (
                     "Possible fall..." if FALLING in states.values() else "Monitoring")
-                banner(frame, f"{label}   {len(people)} person(s)   {fps:4.1f} FPS", alarm=alarm)
+                clip = getattr(src, "clip", None)
+                banner(frame, f"{label}   {clip + '   ' if clip else ''}{len(people)} person(s)   "
+                              f"{fps:4.1f} FPS", alarm=alarm)
                 jpeg = _encode_jpeg(frame)
                 with self._lock:
                     if stop.is_set():
@@ -170,6 +173,7 @@ class MonitorController:
                     self._frame, self._frame_version = jpeg, self._frame_version + 1
                     st = self._status
                     st.fps, st.persons, st.states = round(fps, 1), len(people), states
+                    st.clip = clip
                     st.frames += 1
                     st.events += len(events)
                 for ev in events:

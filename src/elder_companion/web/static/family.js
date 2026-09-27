@@ -15,6 +15,7 @@
   const HISTORY_PAGE = 30;
   const ACTIVITY_DEBOUNCE_MS = 800;
   const FALL_RETRY_MS = 15000;
+  const FALL_STATUS_MS = 2000; // the demo playlist changes clip on its own
   const MEMBER_KEY = "family.memberId";
 
   // ---------- helpers ----------
@@ -320,7 +321,8 @@
     const mode = !s || !s.running ? "stop" : s.live ? "camera" : "demo";
     fallButtons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.fallMode === mode)));
     if (!$("fall-stream").hidden) {
-      $("fall-status").textContent = mode === "camera" ? "Live · camera" : mode === "demo" ? "Live · demo video" : "Paused";
+      $("fall-status").textContent = mode === "camera" ? "Live · camera"
+        : mode === "demo" ? `Demo${s.clip ? ` · ${s.clip}` : ""}` : "Paused";
     }
   }
 
@@ -662,6 +664,9 @@
   loadHistory();
   connectFallStream();
   refreshFallStatus();
+  setInterval(() => {
+    if (!document.hidden && !$("fall-stream").hidden) refreshFallStatus();
+  }, FALL_STATUS_MS);
   connectAlertStream();
 
   window.__dashboard = { loadSummary, loadSymptoms, loadAlerts, loadReminders, showAlertBanner, get summaryStale() { return summaryStale; } };

@@ -62,7 +62,7 @@ fall:
     port: 8001
     events_path: data/fall_events.jsonl
     snapshots_dir: data/snapshots
-    autostart_source: ${FALL_SOURCE:-demo/videos/walk.mp4}   # looped on launch; empty = wait for start_monitoring
+    autostart_source: ${FALL_SOURCE:-demo/videos/demo.m3u}   # looped on launch (every demo scenario); empty = wait
 
 database:
   url: ${DATABASE_URL:-sqlite:///data/app.db}   # relative sqlite paths resolve against the project root
