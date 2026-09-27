@@ -23,6 +23,7 @@ from elder_companion.memory.extractor import (
 from elder_companion.memory.schema import MemoryItemIn, ReminderAck
 from elder_companion.models import MemoryItem, Message, Reminder, ReminderLog
 from elder_companion.privacy import mark_private, privacy_span
+from elder_companion.reports.digest import invalidate
 from elder_companion.settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -161,7 +162,10 @@ class MemoryService:
                 self._s.privacy.max_span_user_messages,
             )
             result.marked_private = covered
-            mark_private(self._session, with_replies(self._session, msg.elder_id, covered))
+            hidden = with_replies(self._session, msg.elder_id, covered)
+            mark_private(self._session, hidden)
+            # Those days were very likely already summarized with this content in them.
+            invalidate(self._session, msg.elder_id, self._local_days(hidden))
             self._session.flush()
             self._session.refresh(msg)
 
@@ -169,6 +173,11 @@ class MemoryService:
             result.items.append(self._merge(msg, item, now, today))
         self._session.commit()
         return result
+
+    def _local_days(self, message_ids: Sequence[int]) -> set[date]:
+        rows = self._session.scalars(select(Message).where(Message.id.in_(list(message_ids))))
+        tz = self._s.chat.tz
+        return {m.created_at.replace(tzinfo=UTC).astimezone(tz).date() for m in rows}
 
     def _today(self) -> date:
         """The elder's local date, from the same clock the rest of the service uses."""

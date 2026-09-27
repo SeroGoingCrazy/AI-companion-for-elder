@@ -29,6 +29,8 @@ FAMILY_ENDPOINTS = (
     "/api/claims",
     "/api/family/members",
     "/family/doctor?days=365",
+    "/family/report/weekly",
+    "/family/report/weekly?week=1",
     "/family/memoir",
 )
 
@@ -70,7 +72,8 @@ def _get_routes(app) -> set[str]:  # noqa: ANN001
 
 def test_the_route_scan_finds_the_apps_routes(client: TestClient) -> None:
     """Guards the guard: if this ever comes back empty, the check below means nothing."""
-    assert {"/api/symptoms", "/api/reminders", "/family"} <= _get_routes(client.app)
+    expected = {"/api/symptoms", "/api/reminders", "/family", "/family/report/weekly"}
+    assert expected <= _get_routes(client.app)
 
 
 def test_family_routes_are_all_scanned(client: TestClient) -> None:

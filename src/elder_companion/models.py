@@ -228,3 +228,30 @@ class ReminderLog(Base):
     message_id: Mapped[int | None] = mapped_column(ForeignKey("message.id"))  # her answer
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class DailyDigest(Base):
+    """One elder-local day, summarized once and kept (spec 3.10, H7).
+
+    Today's dashboard summary and the weekly report both read from here, so a day is
+    summarized once and the weekly page costs no extra model calls for days already seen.
+    `has_private` records that part of the day was held back, without storing any of it.
+    """
+
+    __tablename__ = "daily_digest"
+    __table_args__ = (
+        CheckConstraint(
+            "mood_score IS NULL OR (mood_score BETWEEN 1 AND 5)", name="ck_digest_mood"
+        ),
+        Index("ix_digest_elder_date", "elder_id", "date", unique=True),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    elder_id: Mapped[int] = mapped_column(ForeignKey("elder.id"))
+    date: Mapped[date] = mapped_column()  # the elder's local day
+    summary: Mapped[str] = mapped_column(Text, default="")
+    mood_score: Mapped[int | None] = mapped_column()  # 1 (low) to 5 (bright); None = no chat
+    topics_json: Mapped[str] = mapped_column(Text, default="[]")
+    has_private: Mapped[bool] = mapped_column(default=False, server_default=false())
+    fingerprint: Mapped[str] = mapped_column(String(64), default="")  # regenerate when it moves
+    generated_at: Mapped[datetime] = mapped_column(default=utcnow)
