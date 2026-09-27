@@ -3,7 +3,7 @@
 > Project: **Elder Companion Agent** (an AI companion agent for older adults living alone, plus a family care dashboard)
 > Version: v0.2 (adds companion memory, family loop, parent-controlled privacy, reports)
 > Timeline: 2-day core MVP + 1 day for Stage H; demo location: United States; model provider: OpenAI
-> Build note: Stage H ships without family reminders (H5) and without the daily digest / weekly report (H7); both are deferred (see the Stage H notes).
+> Build note: Stage H ships with family reminders (H5). The daily digest / weekly report (H7) is still deferred (see the Stage H notes).
 > Team: **A (features / lead dev)** — backend, chat, voice, symptom log, family dashboard data; **B (vision / frontend)** — fall detection, UI polish, demo materials
 
 ## Table of Contents
@@ -106,7 +106,7 @@ Beyond health, the agent remembers the ordinary things a friend would: on Monday
 
 ### 2.6 Family Loop
 
-- **Medication / follow-up reminders** *(deferred: not built in this version, H5)*: a family member sets a reminder, either daily at a time or once on a date (e.g., "blood pressure pill, mornings", "ask if she booked the eye-doctor follow-up"). The agent brings it up naturally in the first session after it is due, and records the parent's answer as confirmed / declined / no response. The dashboard shows 7-day adherence. The agent only uses the family's wording and never comments on dose or medication choice.
+- **Medication / follow-up reminders**: a family member sets a reminder, either daily at a time or once on a date (e.g., "blood pressure pill, mornings", "ask if she booked the eye-doctor follow-up"). The agent brings it up naturally in the first session after it is due, and records the parent's answer as confirmed / declined / no response. The dashboard shows 7-day adherence. The agent only uses the family's wording and never comments on dose or medication choice.
 - **Sibling sharing**: several family members share one dashboard (switched with `?member=`), and everyone sees the same summaries. Any member can claim an alert or care-list item ("Ben: I'll call her doctor"), so it's visible who's handling what.
 - **Agenda budget**: each greeting carries at most 3 items, picked in this order: due reminders, then follow-ups. Items that don't fit carry over to the next session, so the opener never feels like a checklist.
 
@@ -443,10 +443,11 @@ alert(id, elder_id, type[symptom|fall], level[high|medium], title, content,
 memory_item(id, elder_id, kind[follow_up|person|topic|story], subject, text, raw_quote,
             message_id, private, mention_count, due_date, status[open|asked|expired],
             retelling, first_seen, last_seen)                    -- retelling: cached memoir text
--- deferred (H5 / H7), not created in this version:
 reminder(id, elder_id, from_member_id, text,
          schedule_time, schedule_date, active, created_at)     -- daily HH:MM or one-off date
-reminder_log(id, reminder_id, date, status[mentioned|confirmed|declined|no_response], message_id)
+reminder_log(id, reminder_id, date, status[mentioned|confirmed|declined|no_response],
+             message_id, created_at, updated_at)               -- unique (reminder_id, date)
+-- deferred (H7), not created in this version:
 daily_digest(id, elder_id, date, summary, mood_score, topics_json, has_private, generated_at)
 claim(id, elder_id, target_type[alert|memory_item|symptom_log], target_id,
       member_id, note, created_at, done_at)
@@ -683,9 +684,9 @@ elder_companion.family_agent (E5) ──▶ accesses fall data only through the 
 | GET | `/api/messages?limit=` | Conversation history (private messages → `{"private": true}` placeholder) | A |
 | GET | `/api/symptoms?days=7` | Symptom log (grouped by day; visible occurrences only) | A |
 | GET | `/api/family/members` | `[{id, name, relation}]` | A |
-| POST | `/api/reminders` | *(deferred, H5)* `{from_member_id, text, schedule_time?, schedule_date?}` → reminder | A |
-| GET | `/api/reminders` | *(deferred, H5)* Reminders with 7-day adherence | A |
-| DELETE | `/api/reminders/{id}` | *(deferred, H5)* Deactivate a reminder | A |
+| POST | `/api/reminders` | `{text, from_member_id?, schedule_time?, schedule_date?}` → reminder with adherence (exactly one schedule) | A |
+| GET | `/api/reminders` | Reminders with 7-day adherence, active first | A |
+| DELETE | `/api/reminders/{id}` | Deactivate a reminder (its history is kept) | A |
 | GET | `/api/care-list` | Visible `person \| topic` items, ≥ threshold mentions | A |
 | GET | `/api/claims` | Claims, newest first, with `member_name` and `done_at` | A |
 | POST | `/api/claims` | `{target_type, target_id, member_id, note}` → claim | A |
@@ -799,12 +800,12 @@ fall:
 | D | D1 D2 D3 D4 | ✅✅✅✅ |
 | E | E1 E2 E3 E4 E5* | ✅✅✅✅⬜ |
 | F | F1 F2 F3 F4 F5 F6 F7 F8 F9* | ✅✅✅✅✅✅✅✅⬜ |
-| H | H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 | ✅✅✅✅⏸✅⏸✅✅✅ |
+| H | H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 | ✅✅✅✅✅✅⏸✅✅✅ |
 | G | G1 G2 G3 G4 | ✅⬜⬜⬜ |
 
 ### 📈 Overall Progress
 
-`34 / 41` (* = optional task, not required for delivery; ⏸ = deferred: H5 reminders and H7 digest / weekly report are out of scope for this build)
+`35 / 41` (* = optional task, not required for delivery; ⏸ = deferred: H7 digest / weekly report, in progress)
 
 ---
 
@@ -1091,13 +1092,18 @@ fall:
 - **How to test**: `uv run pytest -q tests/unit/test_privacy_filter.py tests/integration/test_privacy_leak.py`.
 - **Notes**: E5 is not built, so there is no `family_agent.py` to retrofit. Summary invalidation needs no hook: the cache key includes today's private message ids. Non-urgent symptom alerts raised by a private message are hidden via `alert.message_id`; one pushed live over SSE before a later "keep that between us" can still flash on an open dashboard until its next reload. A visible care-list item whose latest mention is marked private later loses that quote (text falls back to the subject).
 
-### H5 (P0): Reminders on the dashboard ⏸ deferred
-> Not built in this version (decided during Stage H). The agenda, doctor one-pager and demo script run without reminders.
+### H5 (P0): Reminders on the dashboard ✅
 - **Owner**: A (endpoints) / B (UI)
 - **Goal**: `/api/reminders` endpoints (5.5). Dashboard panel: add a reminder (text + daily time or date); list with 7-day adherence dots; deactivate a reminder. The acting member defaults to the first family member (the switcher comes in H9).
 - **Files**: `family_loop/reminders.py`, `web/routes/family.py`, `web/templates/family.html`, `web/static/family.js`, `tests/integration/test_reminders_api.py`.
 - **Acceptance**: Amy adds "blood pressure pill, 8:00" → the next elder greeting after 8:00 checks on it → the parent says "yes, took it" → after a refresh the dashboard shows today as confirmed.
 - **How to test**: `uv run pytest -q tests/integration/test_reminders_api.py`; manual (two windows).
+- **Notes**: delivery is at the greeting only (3.8), so a reminder added mid-session waits for the
+  next one. Acks ride on the memory extractor's `reminder_acks` (3.7), which costs no extra call and
+  is ignored unless that reminder was actually raised today. Unanswered earlier days are swept to
+  `no_response` when the next greeting is built. The adherence row shows status only, never a quote,
+  so a private answer cannot leak through it. The `alert` table is untouched: a missed dose is not
+  an alert, it is a dot on the card.
 
 ### H6 (P1): Doctor one-pager ✅
 - **Owner**: A (query) / B (template, print CSS)
@@ -1105,10 +1111,10 @@ fall:
 - **Files**: `reports/doctor.py`, `web/routes/reports.py`, `web/templates/doctor.html`, `web/static/style.css`, `tests/unit/test_doctor_report.py`.
 - **Acceptance**: prints to ≤ 2 Letter pages; every quote matches a stored `raw_quote`; private non-red-flag symptoms are absent; it makes no LLM call (the test uses a client that raises).
 - **How to test**: `uv run pytest -q tests/unit/test_doctor_report.py`; manual print preview.
-- **Notes**: no reminder-adherence section (H5 deferred). Log rows of the same symptom are combined into one line; the 4 most recent quotes are shown with a count of earlier ones, which keeps the page short.
+- **Notes**: no reminder-adherence section yet (H5 landed after this). Log rows of the same symptom are combined into one line; the 4 most recent quotes are shown with a count of earlier ones, which keeps the page short.
 
 ### H7 (P1): Daily digest and weekly report ⏸ deferred
-> Not built in this version (decided during Stage H). E2's summary keeps its own cache and now reads through `privacy.py`, with the private-day note added in code.
+> Not built yet; next up. E2's summary keeps its own cache and now reads through `privacy.py`, with the private-day note added in code. Reminder adherence (H5) is now available for the report's adherence section.
 - **Owner**: A (B: styling)
 - **Goal**: `daily_summary.txt` → structured `{summary, mood_score, topics}` stored in `daily_digest` (3.10), with E2 reading from it. Weekly report page: mood line, top topics, symptom counts and trend, reminder adherence, and a 2–3 sentence overview.
 - **Files**: `reports/digest.py`, `reports/weekly.py`, `summary.py`, `config/prompts/daily_summary.txt`, `config/prompts/weekly_report.txt`, `web/templates/report_weekly.html`, `tests/unit/test_weekly_aggregate.py`.
@@ -1174,7 +1180,9 @@ fall:
 
 | # | Action | Expected |
 |---|---|---|
-| 1 | Open the elder app and tap "Start chatting" | AI greets by time of day and asks how the orchid repotting went (seed) |
+| 0 | On the dashboard, show Amy's reminder "blood pressure pill with breakfast" and its 7-day dots | One day missed, the rest taken; today not asked yet |
+| 1 | Open the elder app and tap "Start chatting" | AI greets by time of day and raises Amy's reminder in her words ("Amy asked me to check ..."), ahead of the orchid follow-up |
+| 1b | Elder: "Yes, I took it with breakfast." | AI is warm and moves on; the dashboard's dot for today turns green (confirmed) without anyone typing anything |
 | 2 | Elder: "My knee's much better, but I didn't sleep well last night." | AI asks about sleep; `insomnia` is added on the dashboard |
 | 3 | Elder: "这两天早上起来头有点晕" ("I've been a bit dizzy in the mornings these past two days") | AI asks for details; `dizziness` appears on the dashboard timeline |
 | 4 | Elder: "My friend Linda got bad news from her doctor. Keep this between us, okay?" | AI agrees and gives the short safety disclosure; nothing about Linda anywhere on the dashboard |
