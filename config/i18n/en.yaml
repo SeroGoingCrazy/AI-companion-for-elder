@@ -96,6 +96,10 @@ family:
   yesterday: Yesterday
   fall_title: Fall detection
   fall_offline: Fall detection is offline.
+  fall_source: Fall-detection source
+  fall_camera: Camera
+  fall_demo: Demo video
+  fall_pause: Pause
   offline: Offline
   conversation: Conversation
   messages_today: "{n} messages from {nickname} today"

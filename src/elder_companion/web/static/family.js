@@ -18,6 +18,7 @@
   const HISTORY_PAGE = 30;
   const ACTIVITY_DEBOUNCE_MS = 800;
   const FALL_RETRY_MS = 15000;
+  const FALL_STATUS_MS = 2000; // the demo playlist changes clip on its own
   const MEMBER_KEY = "family.memberId";
 
   // ---------- helpers ----------
@@ -360,6 +361,7 @@
       img.hidden = false;
       $("fall-offline").hidden = true;
       $("fall-status").textContent = S.live;
+      refreshFallStatus();
     };
     img.onerror = () => {
       img.hidden = true;
@@ -369,6 +371,53 @@
     };
     img.src = url;
   }
+
+  // Camera / demo video / pause: switches fall-mcp's source through /api/fall (same origin)
+  const fallButtons = [...document.querySelectorAll("[data-fall-mode]")];
+
+  function showFallStatus(s) {
+    const mode = !s || !s.running ? "stop" : s.live ? "camera" : "demo";
+    fallButtons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.fallMode === mode)));
+    if (!$("fall-stream").hidden) {
+      $("fall-status").textContent = mode === "camera" ? "Live · camera"
+        : mode === "demo" ? `Demo${s.clip ? ` · ${s.clip}` : ""}` : "Paused";
+    }
+  }
+
+  function showFallError(msg) {
+    $("fall-error").textContent = msg || "";
+    $("fall-error").hidden = !msg;
+  }
+
+  async function refreshFallStatus() {
+    try {
+      const r = await fetch("/api/fall/status");
+      showFallStatus(r.ok ? await r.json() : null);
+    } catch (e) {
+      showFallStatus(null);
+    }
+  }
+
+  async function setFallSource(mode) {
+    fallButtons.forEach((b) => { b.disabled = true; });
+    showFallError("");
+    try {
+      const r = await fetch("/api/fall/source", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode }),
+      });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) showFallError(body.error || "Couldn't switch the source.");
+      else showFallStatus(body);
+    } catch (e) {
+      showFallError("Fall detection is offline.");
+    } finally {
+      fallButtons.forEach((b) => { b.disabled = false; });
+    }
+  }
+
+  fallButtons.forEach((b) => b.addEventListener("click", () => setFallSource(b.dataset.fallMode)));
 
   // ---------- family members (siblings share this page; ?member= picks who is acting) ----------
 
@@ -675,6 +724,10 @@
   loadSymptoms();
   loadHistory();
   connectFallStream();
+  refreshFallStatus();
+  setInterval(() => {
+    if (!document.hidden && !$("fall-stream").hidden) refreshFallStatus();
+  }, FALL_STATUS_MS);
   connectAlertStream();
 
   window.__dashboard = { loadSummary, loadSymptoms, loadAlerts, loadReminders, showAlertBanner, get summaryStale() { return summaryStale; } };

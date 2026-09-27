@@ -82,7 +82,8 @@ def test_family_routes_are_all_scanned(client: TestClient) -> None:
         path
         for path in _get_routes(client.app)
         if (path.startswith("/family") or path.startswith("/api/"))
-        and not path.startswith(("/api/chat", "/api/tts", "/api/alerts/stream"))
+        # /api/fall only relays fall-mcp's monitor state (source, fps, poses): no chat text
+        and not path.startswith(("/api/chat", "/api/tts", "/api/alerts/stream", "/api/fall"))
     }
     scanned = {p.split("?")[0] for p in FAMILY_ENDPOINTS}
     missing = sorted(family_paths - scanned)

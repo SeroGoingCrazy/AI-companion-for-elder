@@ -726,7 +726,7 @@ llm:
   tts_instructions: "Speak slowly, warmly and clearly, like a caring family member."
   timeout_s: 15
 chat:
-  companion_name: ${COMPANION_NAME:-Sunny}
+  companion_name: ${COMPANION_NAME:-Hallo}
   timezone: ${ELDER_TIMEZONE:-America/Los_Angeles}   # elder's local time
   history_turns: 10
   max_reply_tokens: 150
@@ -1264,7 +1264,7 @@ fall:
 - **Files**: `elder_companion/i18n.py`, `config/i18n/{en,zh}.yaml`, `web/static/{tokens,elder,family}.css`, `web/static/{lang,tabs}.js`, both templates, `web/routes/pages.py`, `web/routes/alerts.py`.
 - **Acceptance**: every key exists in both files with matching placeholders (tested); alert titles follow the reader while the stored record stays English; privacy filtering runs before localization; nothing overflows a 390px viewport.
 - **How to test**: `uv run pytest tests/integration/test_i18n.py tests/integration/test_layout.py -q`.
-- **Note**: `style.css` is kept — the weekly report, doctor one-pager and memoir still use it. The elder and family surfaces moved to the new stylesheets, and the components added on dev (reminders, care list, member picker, claims) were restated in the new tokens.
+- **Note**: the companion's name is never hardcoded in the i18n files — every string uses a `{companion}` placeholder, so the Sunny→Hallo rename needed no translation changes. `style.css` is kept — the weekly report, doctor one-pager and memoir still use it. The elder and family surfaces moved to the new stylesheets, and the components added on dev (reminders, care list, member picker, claims) were restated in the new tokens.
 
 ### Demo Script (draft)
 

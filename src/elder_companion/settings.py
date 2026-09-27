@@ -58,7 +58,7 @@ class LLMSettings(_Model):
 
 
 class ChatSettings(_Model):
-    companion_name: str = "Sunny"
+    companion_name: str = "Hallo"
     timezone: str = "America/Los_Angeles"  # the elder's local time (greetings, "yesterday")
     history_turns: int = 10
     max_reply_tokens: int = 150
@@ -116,6 +116,7 @@ class FallMCPSettings(_Model):
 class FallSettings(_Model):
     model: str = "models/yolo11n-pose.pt"
     device: str = "cpu"
+    camera: int = 0
     min_keypoint_conf: float = 0.3
     aspect_ratio_threshold: float
     torso_angle_deg: float

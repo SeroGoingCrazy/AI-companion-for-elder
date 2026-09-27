@@ -59,7 +59,7 @@ def _summary_calls(llm: MockLLMClient) -> list:
 def test_no_chat_today_is_empty_and_free(session: Session) -> None:
     _say(session, "yesterday's chat", at=NOW_UTC - timedelta(days=1))
     llm = MockLLMClient.from_config()
-    r = DailySummary(llm, companion_name="Sunny", clock=Clock()).get(session, 1, NOW_LOCAL)
+    r = DailySummary(llm, companion_name="Hallo", clock=Clock()).get(session, 1, NOW_LOCAL)
     assert (r.summary, r.empty, r.fallback) == (EMPTY_SUMMARY, True, False)
     assert _summary_calls(llm) == []
 
@@ -85,7 +85,7 @@ def test_prompt_has_today_only_with_local_times(session: Session) -> None:
     )
     session.commit()
     llm = MockLLMClient.from_config()
-    r = DailySummary(llm, companion_name="Sunny", clock=Clock()).get(session, 1, NOW_LOCAL)
+    r = DailySummary(llm, companion_name="Hallo", clock=Clock()).get(session, 1, NOW_LOCAL)
     # An emergency alert leads the summary (daily_summary.txt), so the fall comes first.
     assert r.summary.startswith("A fall was detected") and not r.fallback
 
@@ -94,7 +94,7 @@ def test_prompt_has_today_only_with_local_times(session: Session) -> None:
     assert "mood_score" in system["content"]
     notes = user["content"]
     assert "[9:05 AM] Elder: I watered the roses" in notes
-    assert "Sunny: I see." in notes
+    assert "Hallo: I see." in notes
     assert "yesterday's chat" not in notes
     assert (
         "dizziness: morning dizziness (severity mild, for 2 days, status new, mentioned 2x)"
@@ -106,7 +106,7 @@ def test_prompt_has_today_only_with_local_times(session: Session) -> None:
 def test_stored_digest_is_reused_until_the_day_changes(session: Session) -> None:
     _say(session, "hello")
     llm, clock = MockLLMClient.from_config(), Clock()
-    summary = DailySummary(llm, companion_name="Sunny", clock=clock)
+    summary = DailySummary(llm, companion_name="Hallo", clock=clock)
     first = summary.get(session, 1, NOW_LOCAL)
     clock.now += timedelta(hours=3)  # time alone never invalidates it
     assert summary.get(session, 1, NOW_LOCAL) == first
@@ -120,7 +120,7 @@ def test_stored_digest_is_reused_until_the_day_changes(session: Session) -> None
 def test_refresh_regenerates(session: Session) -> None:
     _say(session, "hello")
     llm = MockLLMClient.from_config()
-    summary = DailySummary(llm, companion_name="Sunny", clock=Clock())
+    summary = DailySummary(llm, companion_name="Hallo", clock=Clock())
     summary.get(session, 1, NOW_LOCAL)
     summary.get(session, 1, NOW_LOCAL, refresh=True)
     assert len(_summary_calls(llm)) == 2
@@ -130,7 +130,7 @@ def test_a_new_privacy_mark_regenerates_the_day(session: Session) -> None:
     """The request usually arrives after the content it covers, so the digest must move."""
     _say(session, "My friend Linda got bad news")
     llm = MockLLMClient.from_config()
-    summary = DailySummary(llm, companion_name="Sunny", clock=Clock())
+    summary = DailySummary(llm, companion_name="Hallo", clock=Clock())
     summary.get(session, 1, NOW_LOCAL)
     for m in session.scalars(select(Message)):
         m.private = True
@@ -146,7 +146,7 @@ def test_llm_failure_gives_plain_summary_and_is_not_cached(session: Session) -> 
     )
     session.commit()
     llm = FlakyLLM.from_config()
-    summary = DailySummary(llm, companion_name="Sunny", clock=Clock())
+    summary = DailySummary(llm, companion_name="Hallo", clock=Clock())
     r = summary.get(session, 1, NOW_LOCAL)
     assert r.fallback
     assert r.summary == "Maggie chatted 1 time that day."

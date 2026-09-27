@@ -149,6 +149,12 @@
           <img id="fall-stream" alt="{{ t.family.fall_title }}" hidden>
           <p id="fall-offline" class="fall-offline">{{ t.family.fall_offline }}</p>
         </div>
+        <div class="fall-controls" role="group" aria-label="{{ t.family.fall_source }}">
+          <button type="button" class="btn btn-small btn-ghost-light" data-fall-mode="camera">{{ t.family.fall_camera }}</button>
+          <button type="button" class="btn btn-small btn-ghost-light" data-fall-mode="demo">{{ t.family.fall_demo }}</button>
+          <button type="button" class="btn btn-small btn-ghost-light" data-fall-mode="stop">{{ t.family.fall_pause }}</button>
+        </div>
+        <p id="fall-error" class="fall-error" role="alert" hidden></p>
       </section>
     </div>
 

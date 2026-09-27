@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "elder-web"],
+      "port": 8000
+    },
+    {
+      "name": "fall-mcp",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "python", "-m", "fall_detector.server", "--no-autostart"],
+      "port": 8001
+    }
+  ]
+}

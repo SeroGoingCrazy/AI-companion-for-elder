@@ -18,9 +18,13 @@ held for 4 s so the "down for 3 s" rule can fire.
 | `fall_02.mp4` | fall-01 | sits on a chair, falls forward near the camera | 1 fall alert |
 | `fall_03.mp4` | fall-05 | walks in, falls at the bottom edge of the frame | 1 fall (known miss: the body on the floor is mostly out of frame, pose confidence ~0.1) |
 | `lie_down.mp4` | adl-10 | sits on the bed, then slowly lies down | no alert |
-| `walk.mp4` | adl-06 | walks, bends over, stands up (autostart idle scene) | no alert |
+| `walk.mp4` | adl-06 | walks, bends over, stands up | no alert |
 | `sit.mp4` | adl-07 | sits down in an armchair | no alert |
 | `crouch.mp4` | adl-01 | crouches down to the floor | no alert |
+
+`demo.m3u` is the dashboard's "Demo video": walk, fall_01, sit, lie_down, fall_02 and crouch in turn,
+looped (fall_03 is left out as a known miss). Play it from the terminal with
+`uv run python -m fall_detector.ctl play demo/videos/demo.m3u --loop`.
 
 Check any clip: `uv run python -m fall_detector --source demo/videos/fall_01.mp4 --show`
 

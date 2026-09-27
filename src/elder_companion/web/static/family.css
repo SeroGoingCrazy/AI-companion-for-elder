@@ -390,3 +390,10 @@ body {
 .dash-sub { margin: 1px 0 0; color: var(--ink-2); font-size: var(--t-meta); }
 .chip { display: inline-block; padding: 3px 11px; border-radius: var(--r-chip); font-size: 13px; font-weight: 700; }
 .sev-red { background: var(--alarm); color: #fff; }
+
+/* Fall-detection source switch (from dev): camera, demo clip, or paused. Inside the dark
+   card, so the buttons are light-on-dark rather than the page's default. */
+.fall-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.fall-controls .btn { border-color: rgba(255,255,255,.4); color: var(--paper-lift); background: transparent; }
+.fall-controls .btn[aria-pressed="true"] { background: var(--amber); border-color: var(--amber); color: var(--ink); }
+.fall-error { margin: 10px 0 0; color: #F0A99B; font-size: var(--t-meta); font-weight: 700; }

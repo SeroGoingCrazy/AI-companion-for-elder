@@ -1,7 +1,7 @@
 """Progressive-web-app plumbing: the two manifests and the service worker.
 
-Both surfaces install separately — the elder installs "Sunny" on their phone, the family
-installs the dashboard on theirs — so each gets its own manifest with its own `id` and
+Both surfaces install separately — the elder installs the companion on their phone, the
+family installs the dashboard on theirs — so each gets its own manifest with its own `id` and
 `start_url`. The manifests are generated rather than static because the companion name is
 configurable (`chat.companion_name`).
 
@@ -116,7 +116,7 @@ def _build_id() -> str:
 def service_worker() -> Response:
     """Serve the worker from the root so its scope covers /elder and /family."""
     source = (WEB_DIR / "static" / "sw.js").read_text(encoding="utf-8")
-    body = source.replace("__BUILD__", f"sunny-{_build_id()}").encode()
+    body = source.replace("__BUILD__", f"care-{_build_id()}").encode()
     return Response(
         body,
         media_type="text/javascript",

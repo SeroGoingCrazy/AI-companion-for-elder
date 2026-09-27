@@ -46,7 +46,7 @@ def _msgs(n: int) -> list[Message]:
 
 def _ctx(history=(), symptoms=(), turns=10):
     return build_context(
-        _elder(), list(history), list(symptoms), NOW, companion_name="Sunny", history_turns=turns
+        _elder(), list(history), list(symptoms), NOW, companion_name="Hallo", history_turns=turns
     )
 
 
@@ -54,7 +54,7 @@ def test_system_prompt_has_persona_profile_and_time() -> None:
     system = _ctx()[0]
     assert system["role"] == "system"
     text = system["content"]
-    assert "You are Sunny" in text
+    assert "You are Hallo" in text
     assert 'Call her "Maggie"' in text
     assert "Margaret Lee" in text
     assert "High blood pressure" in text  # profile included
@@ -108,7 +108,7 @@ def test_greet_context_ends_with_instruction() -> None:
         [],
         [_symptom("knee pain")],
         NOW,
-        companion_name="Sunny",
+        companion_name="Hallo",
         history_turns=10,
     )
     last = ctx[-1]
@@ -120,7 +120,7 @@ def test_greet_context_ends_with_instruction() -> None:
 
 def test_greet_language_follows_last_user_message() -> None:
     history = [Message(role="user", text="今天挺好的"), Message(role="assistant", text="太好了")]
-    ctx = build_greet_context(_elder(), history, [], NOW, companion_name="Sunny", history_turns=10)
+    ctx = build_greet_context(_elder(), history, [], NOW, companion_name="Hallo", history_turns=10)
     assert "Chinese" in ctx[-1]["content"]
     assert "Ask how she is feeling today." in ctx[-1]["content"]
 

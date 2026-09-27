@@ -21,7 +21,7 @@ llm:
   timeout_s: 15
 
 chat:
-  companion_name: ${COMPANION_NAME:-Sunny}
+  companion_name: ${COMPANION_NAME:-Hallo}
   timezone: ${ELDER_TIMEZONE:-America/Los_Angeles}   # elder's local time for greetings / "yesterday"
   history_turns: 10                                  # turns = user+assistant pairs kept in context
   max_reply_tokens: 150
@@ -47,6 +47,7 @@ privacy:
 fall:
   model: ${FALL_MODEL:-models/yolo11n-pose.pt}   # fetched by scripts/fetch_demo_media.py
   device: ${FALL_DEVICE:-cpu}                    # cpu | mps (Apple Silicon) | 0 (CUDA)
+  camera: ${FALL_CAMERA:-0}                      # camera index the dashboard's Camera button uses
   min_keypoint_conf: 0.3                         # keypoints below this are ignored
   aspect_ratio_threshold: 1.2                    # bbox width / height above this = lying
   torso_angle_deg: 60                            # torso this far from vertical = lying
@@ -61,7 +62,7 @@ fall:
     port: 8001
     events_path: data/fall_events.jsonl
     snapshots_dir: data/snapshots
-    autostart_source: ${FALL_SOURCE:-demo/videos/walk.mp4}   # looped on launch; empty = wait for start_monitoring
+    autostart_source: ${FALL_SOURCE:-demo/videos/demo.m3u}   # looped on launch (every demo scenario); empty = wait
 
 database:
   url: ${DATABASE_URL:-sqlite:///data/app.db}   # relative sqlite paths resolve against the project root

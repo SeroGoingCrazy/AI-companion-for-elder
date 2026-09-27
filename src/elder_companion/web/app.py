@@ -22,7 +22,7 @@ from elder_companion.seed import seed_demo
 from elder_companion.settings import Settings, get_settings
 from elder_companion.summary import DailySummary
 from elder_companion.symptoms.extractor import SymptomExtractor
-from elder_companion.web.routes import alerts, chat, fall_proxy, family, pages, pwa, reports
+from elder_companion.web.routes import alerts, chat, fall, fall_proxy, family, pages, pwa, reports
 
 
 def create_app(settings: Settings | None = None, llm: BaseLLMClient | None = None) -> FastAPI:
@@ -58,6 +58,7 @@ def create_app(settings: Settings | None = None, llm: BaseLLMClient | None = Non
     app.include_router(alerts.router)
     app.include_router(chat.router)
     app.include_router(chat.tts_router)
+    app.include_router(fall.router)
     app.include_router(family.router)
     app.include_router(pages.router)
     app.include_router(reports.router)

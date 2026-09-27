@@ -96,6 +96,10 @@ family:
   yesterday: 昨天
   fall_title: 跌倒检测
   fall_offline: 跌倒检测未开启。
+  fall_source: 画面来源
+  fall_camera: 摄像头
+  fall_demo: 演示视频
+  fall_pause: 暂停
   offline: 未开启
   conversation: 聊天记录
   messages_today: "{nickname}今天说了 {n} 句"

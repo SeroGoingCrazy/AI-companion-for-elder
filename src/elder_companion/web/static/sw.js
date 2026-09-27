@@ -1,4 +1,4 @@
-/* Sunny service worker.
+/* Service worker for both installed surfaces.
  *
  * Why this exists: the demo runs on venue wifi. Precaching the shell means the app opens
  * instantly and still renders when the network stalls, and it is what makes both surfaces

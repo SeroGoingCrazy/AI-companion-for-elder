@@ -1,7 +1,7 @@
 """Control a running fall-mcp service from the terminal (demo helper).
 
     uv run python -m fall_detector.ctl play demo/videos/fall_01.mp4   # play once, then hold
-    uv run python -m fall_detector.ctl play demo/videos/walk.mp4 --loop
+    uv run python -m fall_detector.ctl play demo/videos/demo.m3u --loop  # every scenario in turn
     uv run python -m fall_detector.ctl play 0                         # camera
     uv run python -m fall_detector.ctl stop
     uv run python -m fall_detector.ctl status

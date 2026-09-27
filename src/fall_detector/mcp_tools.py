@@ -81,7 +81,8 @@ def build_mcp(controller: MonitorController, store: EventStore) -> MCPServer:
         dashboard.
 
         Args:
-            source: camera index such as "0", or a video file path such as "demo/videos/fall_01.mp4".
+            source: camera index such as "0", a video file path such as "demo/videos/fall_01.mp4",
+                or an .m3u playlist such as "demo/videos/demo.m3u" (every demo scenario in turn).
             loop: replay a video file when it ends (ignored for cameras).
         """
         try:

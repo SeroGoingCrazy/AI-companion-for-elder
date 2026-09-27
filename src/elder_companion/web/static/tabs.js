@@ -12,7 +12,7 @@
   if (!bar) return;
 
   const tabs = [...bar.querySelectorAll("[data-panel]")];
-  const KEY = "sunny.tab";
+  const KEY = "care.tab";
 
   function show(name, remember = true) {
     let matched = false;

@@ -85,14 +85,16 @@ uv run python scripts/fetch_demo_media.py      # models/yolo11n-pose.pt + demo/v
 Run it next to the web app (`uv run elder-web`):
 
 ```bash
-uv run python -m fall_detector.server                          # :8001, loops demo/videos/walk.mp4
+uv run python -m fall_detector.server                          # :8001, loops demo/videos/demo.m3u
 uv run python -m fall_detector.ctl play demo/videos/fall_01.mp4  # demo step: play the fall once
 uv run python -m fall_detector.ctl play demo/videos/walk.mp4 --loop
 ```
 
 The dashboard's fall panel shows the live view (`:8001/stream`); a confirmed fall posts an alert with a
-snapshot to the dashboard. Use a camera with `--source 0` (or `FALL_SOURCE=0`); on Apple Silicon set
-`FALL_DEVICE=mps`. Check a single clip without the service:
+snapshot to the dashboard. The panel's **Camera / Demo video / Pause** buttons switch the source; Demo video
+plays every scenario in [demo/videos/demo.m3u](demo/videos/demo.m3u) in turn, Camera
+uses `FALL_CAMERA` (default `0`; on a Mac with Continuity Camera, `0` may be the iPhone, so try `1`).
+From the terminal: `--source 0` (or `FALL_SOURCE=0`). On Apple Silicon set `FALL_DEVICE=mps`. Check a single clip without the service:
 `uv run python -m fall_detector --source demo/videos/lie_down.mp4 --show`.
 
 MCP: Streamable HTTP at `http://127.0.0.1:8001/mcp`, or stdio for Claude Desktop — see
