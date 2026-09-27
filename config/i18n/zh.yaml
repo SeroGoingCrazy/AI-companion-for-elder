@@ -78,6 +78,8 @@ family:
   unread: "{n} 条新"
   mark_read: 标为已读
   mark_as_read: 标为已读
+  show_handled: "查看已处理（{n}）"
+  hide_handled: 收起已处理
   urgent: 紧急
   watch: 留意
   from_chat: 来自聊天

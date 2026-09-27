@@ -119,6 +119,14 @@ body {
 .alert-item.level-high { border-left-color: var(--alarm); background: var(--alarm-wash); }
 .alert-item.level-medium { border-left-color: var(--watch); background: var(--watch-wash); }
 .alert-item.is-read { opacity: .58; }
+.alert-item { transition: opacity 200ms ease, transform 200ms ease; }
+.alert-item.is-leaving { opacity: 0; transform: translateX(24px); }
+.handled-toggle {
+  margin-top: 12px; padding: 6px 0; border: 0; background: none; cursor: pointer;
+  color: var(--ink-2); font: inherit; font-size: var(--t-meta);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) { .alert-item { transition: none; } }
 .alert-icon { grid-row: span 3; font-size: 21px; line-height: 1.2; }
 .alert-title { margin: 0; font-weight: 700; font-size: 18px; }
 .alert-content { margin: 2px 0 0; color: var(--ink-2); }

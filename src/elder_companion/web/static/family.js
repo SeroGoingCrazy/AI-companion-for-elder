@@ -105,6 +105,11 @@
 
   const alerts = new Map(); // id -> alert
   let bannerAlert = null;
+  let showHandled = false; // handled alerts leave the list; this brings them back for a look
+  const LEAVE_MS = 220;
+
+  // Read, or someone in the family said "I'll handle this": it is dealt with, off the list.
+  const isHandled = (a) => a.is_read || claims.has(`alert:${a.id}`);
 
   function alertItem(a) {
     const isFall = a.type === "fall";
@@ -127,10 +132,16 @@
   }
 
   function renderAlerts() {
-    const list = [...alerts.values()].sort((a, b) => b.id - a.id);
-    $("alert-list").replaceChildren(...list.map(alertItem));
-    $("alerts-empty").hidden = list.length > 0;
-    const unread = list.filter((a) => !a.is_read).length;
+    const all = [...alerts.values()].sort((a, b) => b.id - a.id);
+    const open = all.filter((a) => !isHandled(a));
+    const handled = all.filter(isHandled);
+    $("alert-list").replaceChildren(...(showHandled ? all : open).map(alertItem));
+    $("alerts-empty").hidden = open.length > 0;
+    const toggle = $("alerts-handled-toggle");
+    toggle.hidden = handled.length === 0;
+    toggle.textContent = showHandled ? S.hide_handled : window.fmt(S.show_handled, { n: handled.length });
+    toggle.setAttribute("aria-expanded", String(showHandled));
+    const unread = open.length;
     $("unread-count").hidden = unread === 0;
     $("unread-count").textContent = window.fmt(S.unread, { n: unread });
     const badge = $("tab-badge");
@@ -155,9 +166,18 @@
     }
   }
 
+  // Let the row fade out before the list re-renders without it.
+  function leave(id) {
+    if (showHandled) return Promise.resolve();
+    const li = document.querySelector(`#alert-list [data-id="${id}"]`);
+    if (!li || li.classList.contains("is-leaving")) return Promise.resolve();
+    li.classList.add("is-leaving");
+    return new Promise((r) => setTimeout(r, LEAVE_MS));
+  }
+
   async function markRead(id) {
     try {
-      const a = await api(`/api/alerts/${id}/read`, { method: "POST" });
+      const [a] = await Promise.all([api(`/api/alerts/${id}/read`, { method: "POST" }), leave(id)]);
       alerts.set(a.id, a);
       renderAlerts();
       if (bannerAlert && bannerAlert.id === id) {
@@ -472,12 +492,15 @@
 
   async function saveClaim(targetType, targetId, note) {
     try {
+      if (targetType === "alert") await leave(targetId);
       const c = await api("/api/claims", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ target_type: targetType, target_id: targetId, member_id: memberId, note }),
       });
       claims.set(`${targetType}:${targetId}`, c);
+      // Someone owns it now: clear it for everyone (unread count, urgent banner).
+      if (targetType === "alert" && !(alerts.get(targetId) || {}).is_read) await markRead(targetId);
     } catch (e) {
       console.error(e);
     }
@@ -709,6 +732,10 @@
   // ---------- start ----------
 
   $("summary-refresh").addEventListener("click", () => loadSummary(true));
+  $("alerts-handled-toggle").addEventListener("click", () => {
+    showHandled = !showHandled;
+    renderAlerts();
+  });
   $("banner-read").addEventListener("click", () => bannerAlert && markRead(bannerAlert.id));
   $("banner-close").addEventListener("click", hideBanner);
   $("sound-btn").addEventListener("click", () => setSound(!soundOn));
