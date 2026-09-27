@@ -1,0 +1,91 @@
+# L2 memory-extraction eval (DEV_SPEC 4.2): exact match on the set of (kind, subject);
+# subjects compare case-insensitively, and `optional` pairs may appear without failing.
+# expect_privacy: true = privacy_request.requested must be true (recall must be 100%).
+# context: earlier turns as [role, text] (ids are assigned in order).
+
+# --- plans -> follow_up ---
+- say: "I'm going to repot my orchid this week"
+  expect_items: [[follow_up, orchid]]
+- say: "My grandson Leo has his math exam on Friday, he's so nervous."
+  expect_items: [[follow_up, grandson Leo]]
+  optional: [[follow_up, math exam], [follow_up, Leo's exam], [follow_up, Leo], [person, grandson Leo], [person, Leo]]
+- say: "明天我要去参加社区的合唱排练。"          # "Tomorrow I'm going to community choir rehearsal"
+  expect_items: [[follow_up, choir rehearsal]]
+  optional: [[follow_up, community choir rehearsal], [follow_up, choir], [follow_up, community choir]]
+- say: "Amy is coming to visit next weekend, I want to bake her favorite pie."
+  expect_items: [[follow_up, Amy's visit]]
+  optional: [[follow_up, Amy visit], [follow_up, visit from Amy], [follow_up, Amy], [follow_up, pie], [follow_up, baking pie]]
+- say: "I'm seeing the eye doctor tomorrow afternoon."
+  expect_items: [[follow_up, eye doctor]]
+  optional: [[follow_up, eye doctor appointment], [follow_up, eye doctor visit]]
+
+# --- people and topics ---
+- say: "Rosa from next door brought me soup again."
+  context: [[user, "Rosa next door is such a dear."], [assistant, "She sounds lovely!"]]
+  expect_items: [[person, Rosa]]
+- say: "The church choir is doing Christmas songs already."
+  expect_items: [[topic, church choir]]
+  optional: [[topic, choir], [topic, christmas songs]]
+- say: "我那盆月季终于开花了！"                 # "My potted roses finally bloomed!"
+  expect_items: [[topic, roses]]
+  optional: [[topic, rose], [topic, potted roses], [topic, garden], [topic, China rose], [topic, rose plant]]
+
+# --- stories ---
+- say: "When I started teaching in 1972, my first class had forty-two children."
+  expect_items: [[story, first teaching class]]
+  subject_free: [story]
+- say: "Did I ever tell you how I met my husband? It was at a dance hall in Shanghai, 1968."
+  expect_items: [[story, meeting husband]]
+  subject_free: [story]
+
+# --- nothing worth remembering ---
+- say: "I had some toast and watched TV."
+  expect_items: []
+- say: "Good morning!"
+  expect_items: []
+- say: "It's a bit cloudy today."
+  expect_items: []
+- say: "嗯，好的。"
+  expect_items: []
+
+# --- health: symptom extractor only ---
+- say: "My knee is hurting again."
+  expect_items: []
+- say: "I didn't sleep well last night."
+  expect_items: []
+- say: "这两天早上起来头有点晕"
+  expect_items: []
+- say: "I took my blood pressure pill after breakfast."
+  expect_items: []
+
+# --- answering a follow-up is not a new plan ---
+- say: "It went well, the orchid looks happy in its new pot."
+  context: [[assistant, "How did the orchid repotting go?"]]
+  expect_items: []
+  optional: [[topic, orchid], [follow_up, orchid]]
+
+# --- privacy requests ---
+- say: "My friend Linda got bad news from her doctor. Please keep this between us."
+  expect_items: [[person, Linda]]
+  optional: [[person, friend Linda]]
+  expect_privacy: true
+- say: "Please don't tell my daughter about this, okay?"
+  context: [[user, "I spent too much money on the shopping channel."], [assistant, "Oh, what did you buy?"]]
+  expect_items: []
+  optional: [[topic, shopping channel]]
+  expect_privacy: true
+- say: "别告诉我女儿，我昨天在厨房摔了一跤"       # "Don't tell my daughter, I fell in the kitchen yesterday"
+  expect_items: []
+  expect_privacy: true
+- say: "这个你知道就好，别跟孩子们说。"          # "Just you should know this, don't tell the kids."
+  context: [[user, "我最近在考虑把老房子卖掉。"], [assistant, "这是个大决定呢。"]]
+  expect_items: []
+  optional: [[topic, selling the old house], [topic, old house], [topic, selling house], [topic, house]]
+  expect_privacy: true
+- say: "This is just between you and me: I'm thinking of getting a dog."
+  expect_items: [[topic, getting a dog]]
+  optional: [[follow_up, getting a dog], [topic, dog], [follow_up, dog]]
+  expect_privacy: true
+- say: "You can tell Amy I said hello!"
+  expect_items: []
+  optional: [[person, Amy]]

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from elder_companion.alerts.bus import AlertBus
 from elder_companion.chat.service import ChatService
-from elder_companion.symptoms.service import process_message_symptoms
+from elder_companion.pipeline import process_elder_message
 
 
 def get_session(request: Request) -> Iterator[Session]:
@@ -38,13 +38,15 @@ AlertBusDep = Annotated[AlertBus, Depends(get_alert_bus)]
 
 
 def get_symptom_pipeline(request: Request) -> Callable[[int], object]:
-    """`pipeline(user_message_id)`: run as a BackgroundTask after a chat turn."""
+    """`pipeline(user_message_id)`: run as a BackgroundTask after a chat turn (symptoms, then
+    companion memory)."""
     state = request.app.state
     return partial(
-        process_message_symptoms,
+        process_elder_message,
         state.sessionmaker,
         state.symptom_extractor,
-        state.settings.symptoms,
+        state.memory_extractor,
+        state.settings,
         state.alert_bus,
     )
 

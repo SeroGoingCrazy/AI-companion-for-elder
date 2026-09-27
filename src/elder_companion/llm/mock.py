@@ -26,6 +26,22 @@ _SILENT_MP3_FRAME = b"\xff\xfb\x90\x64" + b"\x00" * 413
 SILENT_MP3 = _SILENT_MP3_FRAME * 4
 
 _CJK = re.compile(r"[一-鿿]")
+# Memory extraction puts the utterance under "Current utterance [#<id>]:". Results may use the
+# placeholder below where the real model would give that id (privacy_request.covers_message_ids).
+_CURRENT_ID = re.compile(r"\[#(\d+)\]:?\s*\n[^\n]*\Z")
+CURRENT_MESSAGE_ID = "$current_message_id"
+
+
+def _fill_current_id(value: Any, current_id: int | None) -> Any:
+    if isinstance(value, dict):
+        return {k: _fill_current_id(v, current_id) for k, v in value.items()}
+    if isinstance(value, list):
+        return [
+            _fill_current_id(v, current_id)
+            for v in value
+            if not (v == CURRENT_MESSAGE_ID and current_id is None)
+        ]
+    return current_id if value == CURRENT_MESSAGE_ID else value
 
 
 def _match(text: str, rules: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -72,8 +88,11 @@ class MockLLMClient(BaseLLMClient):
         user_text = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
         # Match only the last paragraph: extraction puts earlier turns before the utterance,
         # and a symptom mentioned back there must not fire its rule again.
-        rule = _match(user_text.rsplit("\n\n", 1)[-1], cfg.get("rules", []))
-        return copy.deepcopy(rule["result"] if rule else cfg.get("default", {}))
+        last = user_text.rsplit("\n\n", 1)[-1]
+        rule = _match(last, cfg.get("rules", []))
+        result = copy.deepcopy(rule["result"] if rule else cfg.get("default", {}))
+        m = _CURRENT_ID.search(last)
+        return _fill_current_id(result, int(m.group(1)) if m else None)
 
     def transcribe(self, audio: bytes, *, filename: str, language: str | None = None) -> str:
         self.calls.append(("transcribe", filename))

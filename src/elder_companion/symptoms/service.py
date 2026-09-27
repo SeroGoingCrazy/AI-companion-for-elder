@@ -153,16 +153,15 @@ class SymptomService:
         return alert
 
 
-def process_message_symptoms(
+def run_symptom_pipeline(
     session_factory: sessionmaker[Session],
     extractor: SymptomExtractor,
     settings: SymptomSettings,
     bus: AlertBus | None,
     message_id: int,
-) -> list[AlertOut]:
-    """Background task after a chat turn. Never raises: a failure here must not affect chat.
-    Publishes each new alert, then an `activity` event (also after a failed extraction: the
-    message itself is new for the dashboard's history)."""
+) -> tuple[list[AlertOut], int]:
+    """Extract, merge and alert; publish each new alert right away. Never raises.
+    Returns (alerts, number of symptom rows touched)."""
     outs: list[AlertOut] = []
     symptoms = 0
     try:
@@ -177,5 +176,20 @@ def process_message_symptoms(
     if bus is not None:
         for out in outs:
             bus.publish(StreamEvent.alert(out))
+    return outs, symptoms
+
+
+def process_message_symptoms(
+    session_factory: sessionmaker[Session],
+    extractor: SymptomExtractor,
+    settings: SymptomSettings,
+    bus: AlertBus | None,
+    message_id: int,
+) -> list[AlertOut]:
+    """Background task after a chat turn. Never raises: a failure here must not affect chat.
+    Publishes each new alert, then an `activity` event (also after a failed extraction: the
+    message itself is new for the dashboard's history)."""
+    outs, symptoms = run_symptom_pipeline(session_factory, extractor, settings, bus, message_id)
+    if bus is not None:
         bus.publish(StreamEvent.activity(message_id, symptoms))
     return outs

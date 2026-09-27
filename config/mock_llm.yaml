@@ -83,6 +83,32 @@ json:
                duration: null, onset: null, status: ongoing, raw_quote: knee}
             - {canonical: joint_pain, label: 膝盖疼, body_part: knee, severity: unknown,
                duration: null, onset: null, status: ongoing, raw_quote: 膝盖}
+  # memory_extraction: "$current_message_id" is replaced with the id of the utterance.
+  memory_extraction:
+    default: {items: [], privacy_request: {requested: false, covers_message_ids: []}}
+    rules:
+      - match: ["between us"]
+        result:
+          items:
+            - {kind: person, subject: Linda, text: her friend Linda got bad news from her doctor,
+               due_in_days: null, raw_quote: Linda}
+          privacy_request: {requested: true, covers_message_ids: [$current_message_id]}
+      - match: ["别告诉"]
+        result:
+          items: []
+          privacy_request: {requested: true, covers_message_ids: [$current_message_id]}
+      - match: ["orchid"]
+        result:
+          items:
+            - {kind: follow_up, subject: orchid, text: planning to repot her orchid this week,
+               due_in_days: 3, raw_quote: orchid}
+          privacy_request: {requested: false, covers_message_ids: []}
+      - match: ["Rosa"]
+        result:
+          items:
+            - {kind: person, subject: Rosa, text: her neighbor Rosa, due_in_days: null,
+               raw_quote: Rosa}
+          privacy_request: {requested: false, covers_message_ids: []}
 
 transcribe:
   default: "Good morning! I'm doing okay today."
