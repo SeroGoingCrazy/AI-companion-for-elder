@@ -57,3 +57,20 @@ def test_fall_snapshots_served_from_data_dir(client: TestClient) -> None:
     assert r.status_code == 200 and r.content == b"\xff\xd8\xff\xd9"
     assert client.get("/media/snapshots/missing.jpg").status_code == 404
     assert client.get("/media/snapshots/../app.db").status_code == 404
+
+
+def test_family_page_has_stage_h_panels_and_report_links(client: TestClient) -> None:
+    html = client.get("/family").text
+    for element_id in ("member-select", "care-list", "care-empty"):
+        assert f'id="{element_id}"' in html
+    assert 'href="/family/doctor"' in html and 'href="/family/memoir"' in html
+    assert '"members": [{"id": 1, "name": "Amy", "relation": "daughter"}, ' in html
+    assert '"memberId": null' in html
+
+
+@pytest.mark.parametrize(("member", "expected"), [("ben", 2), ("Ben", 2), ("1", 1), ("zoe", None)])
+def test_member_query_picks_by_name_or_id(
+    client: TestClient, member: str, expected: int | None
+) -> None:
+    html = client.get(f"/family?member={member}").text
+    assert f'"memberId": {"null" if expected is None else expected}' in html
