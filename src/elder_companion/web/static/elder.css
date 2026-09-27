@@ -112,6 +112,27 @@ body {
   align-self: flex-end; background: var(--ink); color: var(--paper-lift);
   border-radius: var(--r-card) var(--r-card) 7px var(--r-card);
 }
+.bubble-text { margin: 0; }
+
+/* Replay: a large, unmistakable control under each of her replies, so a missed or
+ * half-heard sentence is one tap away. Same amber and press-down as the talk bar,
+ * so it reads as "a thing you press" without having to be learned. */
+.replay {
+  margin-top: 12px; min-height: var(--tap); padding: 0 20px 0 16px;
+  display: inline-flex; align-items: center; gap: 9px;
+  border: 0; border-radius: var(--r-chip);
+  background: var(--amber); color: var(--ink);
+  font-family: var(--face-ui); font-size: 19px; font-weight: 700; line-height: 1;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 3px 0 var(--amber-deep);
+}
+.replay svg { width: 24px; height: 24px; flex: none; fill: currentColor; }
+.replay:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--amber-deep); }
+.replay:focus-visible { outline: 4px solid var(--ink); outline-offset: 3px; }
+.replay:disabled { background: var(--rule); color: var(--ink-2); box-shadow: none; cursor: default; }
+.bubble.playing { border-color: var(--calm); box-shadow: 0 0 0 2px var(--calm), var(--lift-1); }
+.bubble.playing .replay { background: var(--calm); color: #fff; box-shadow: 0 3px 0 rgba(0,0,0,.25); }
+
 @keyframes bubble-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
 /* ---------- status line ---------- */

@@ -118,3 +118,13 @@ def test_the_opening_line_follows_her_app(client: TestClient, lang: str, pattern
 
 def test_the_elder_page_tells_the_server_its_language(client: TestClient) -> None:
     assert "lang: cfg.lang" in client.get("/static/elder.js").text
+
+
+@pytest.mark.parametrize("lang", available_langs())
+def test_the_replay_button_is_labelled_in_her_language(client: TestClient, lang: str) -> None:
+    """Every reply carries a replay button; elder.js reads its label from APP_CONFIG.t."""
+    import json
+
+    html = client.get(f"/elder?lang={lang}").text
+    assert json.dumps(strings(lang)["elder"]["replay"]) in html
+    assert "replay_stop" in html

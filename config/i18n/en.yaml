@@ -27,6 +27,9 @@ elder:
   voice_group: "{companion}'s voice"
   voice_female: Woman's voice
   voice_male: Man's voice
+  replay: Play again
+  replay_stop: Stop
+  replay_label: Play this message again
   your_message: Your message
   placeholder: Type a message…
   send: Send

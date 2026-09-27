@@ -41,6 +41,9 @@
     holdToTalk: S.hold_to_talk,
     stopAndSend: S.stop_and_send,
     pressAndSpeak: S.press_and_speak,
+    replay: S.replay,
+    replayStop: S.replay_stop,
+    replayLabel: S.replay_label,
   };
   const TAP_MS = 350;          // shorter press = tap mode (tap again to stop)
   const MIN_RECORD_MS = 500;   // ignore accidental blips
@@ -67,6 +70,7 @@
   let meter = null; // { source, timer } while recording
   let peakLevel = 0;
   let lastReply = null; // { id, text } of the latest reply, replayed when the voice changes
+  let playingBubble = null; // the assistant bubble whose words are being spoken
 
   // ---------- voice switch ----------
 
@@ -102,17 +106,64 @@
     els.mic.setAttribute("aria-pressed", String(next === "listening"));
     els.mic.setAttribute("aria-label", next === "listening" ? TEXT.stopAndSend : TEXT.holdToTalk);
     els.mic.disabled = next === "thinking";
+    if (next !== "speaking") markPlaying(null);
+    // Nothing to replay while she is talking or waiting for an answer.
+    const busy = next === "listening" || next === "thinking";
+    for (const b of els.conversation.querySelectorAll(".replay")) b.disabled = busy;
   }
 
-  function addBubble(role, text) {
+  const SPEAKER_ICON =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12.5 5v14l-5-4.5H4z"/>' +
+    '<path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  const STOP_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+
+  function renderReplay(bubble) {
+    const btn = bubble.querySelector(".replay");
+    if (!btn) return;
+    const playing = bubble === playingBubble;
+    btn.innerHTML = `${playing ? STOP_ICON : SPEAKER_ICON}<span>${playing ? TEXT.replayStop : TEXT.replay}</span>`;
+    btn.setAttribute("aria-pressed", String(playing));
+    btn.setAttribute("aria-label", playing ? TEXT.replayStop : TEXT.replayLabel);
+  }
+
+  function markPlaying(bubble) {
+    if (playingBubble === bubble) return;
+    const prev = playingBubble;
+    playingBubble = bubble;
+    if (prev) { prev.classList.remove("playing"); renderReplay(prev); }
+    if (bubble) { bubble.classList.add("playing"); renderReplay(bubble); }
+  }
+
+  function addBubble(role, text, messageId) {
     const div = document.createElement("div");
     div.className = `bubble ${role}`;
-    div.textContent = text;
     if (langOf(text) === "zh") div.lang = "zh";
+    if (role === "assistant") {
+      const p = document.createElement("p");
+      p.className = "bubble-text";
+      p.textContent = text;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "replay";
+      btn.addEventListener("click", () => {
+        if (div === playingBubble) { // second tap stops it
+          stopSpeaking();
+          return;
+        }
+        if (state === "listening" || state === "thinking") return;
+        stopSpeaking();
+        playReply(messageId, text, div);
+      });
+      div.append(p, btn);
+      renderReplay(div);
+    } else {
+      div.textContent = text;
+    }
     els.conversation.append(div);
     while (els.conversation.children.length > MAX_BUBBLES) {
       els.conversation.firstElementChild.remove();
     }
+    return div;
   }
 
   async function postJSON(url, body) {
@@ -211,13 +262,19 @@
 
   let playSeq = 0; // a newer playReply (voice switch) supersedes the one in flight
 
-  async function playReply(messageId, text) {
-    lastReply = { id: messageId, text };
+  async function playReply(messageId, text, bubble) {
+    lastReply = { id: messageId, text, bubble };
     const seq = ++playSeq;
     const current = () => state === "speaking" && seq === playSeq;
     setStatus("speaking");
+    markPlaying(bubble || null);
     const t0 = performance.now();
     try {
+      if (!messageId) { // nothing stored server-side to synthesise: use the browser voice
+        await speakWithBrowser(text);
+        if (current()) setStatus("idle");
+        return;
+      }
       const res = await fetch(`/api/tts/${messageId}?voice=${encodeURIComponent(voice)}`, { cache: "no-cache" });
       if (!current()) return; // she started talking again meanwhile
       if (res.status === 200) {
@@ -236,8 +293,8 @@
   }
 
   async function showReply(data) {
-    addBubble("assistant", data.reply_text);
-    if (data.message_id) await playReply(data.message_id, data.reply_text);
+    const bubble = addBubble("assistant", data.reply_text, data.message_id);
+    if (data.message_id) await playReply(data.message_id, data.reply_text, bubble);
     else setStatus("idle");
   }
 
@@ -433,7 +490,7 @@
     // Let her hear the new voice right away: replay the latest reply.
     if (lastReply && (state === "idle" || state === "speaking")) {
       stopSpeaking();
-      playReply(lastReply.id, lastReply.text);
+      playReply(lastReply.id, lastReply.text, lastReply.bubble);
     }
   });
 

@@ -27,6 +27,9 @@ elder:
   voice_group: "{companion}的声音"
   voice_female: 女声
   voice_male: 男声
+  replay: 再听一遍
+  replay_stop: 停止
+  replay_label: 再听一遍这句话
   your_message: 您要说的话
   placeholder: 在这里打字…
   send: 发送
