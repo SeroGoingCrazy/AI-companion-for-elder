@@ -12,8 +12,9 @@ from pydantic import BaseModel, ConfigDict
 from elder_companion.dashboard import symptom_timeline
 from elder_companion.db import UtcDateTime
 from elder_companion.elders import ElderNotFound, get_elder
+from elder_companion.memory.care_list import CARE_KINDS, care_list
 from elder_companion.models import Elder
-from elder_companion.privacy import SymptomView, history_page
+from elder_companion.privacy import SymptomView, history_page, visible_memory
 from elder_companion.symptoms.schema import Severity, Status, get_catalog
 from elder_companion.web.deps import SessionDep
 
@@ -154,3 +155,29 @@ def get_today_summary(
         empty=r.empty,
         has_private=r.has_private,
     )
+
+
+class CareItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    kind: str  # person | topic
+    subject: str
+    text: str
+    raw_quote: str  # her latest words about it ("" when those were private)
+    mention_count: int
+    first_seen: UtcDateTime
+    last_seen: UtcDateTime
+
+
+@router.get("/care-list", response_model=list[CareItemOut])
+def get_care_list(
+    request: Request, session: SessionDep, elder_id: int | None = None
+) -> list[CareItemOut]:
+    """People and topics she keeps mentioning, most recent first (private ones never)."""
+    elder = elder_or_404(session, elder_id)
+    items = care_list(
+        visible_memory(session, elder.id, CARE_KINDS),
+        request.app.state.settings.memory.care_list_min_mentions,
+    )
+    return [CareItemOut.model_validate(i) for i in items]
