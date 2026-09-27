@@ -802,12 +802,12 @@ fall:
 | D | D1 D2 D3 D4 | ✅✅✅✅ |
 | E | E1 E2 E3 E4 E5* | ✅✅✅✅⬜ |
 | F | F1 F2 F3 F4 F5 F6 F7 F8 F9* | ✅✅✅✅✅✅✅✅⬜ |
-| H | H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 | ✅✅✅✅⏸✅⏸✅✅✅✅✅ |
+| H | H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 | ✅✅✅✅⏸✅⏸✅✅✅✅✅✅✅ |
 | G | G1 G2 G3 G4 | ✅⬜⬜⬜ |
 
 ### 📈 Overall Progress
 
-`36 / 43` (* = optional task, not required for delivery; ⏸ = deferred: H5 reminders and H7 digest / weekly report are out of scope for this build)
+`38 / 45` (* = optional task, not required for delivery; ⏸ = deferred: H5 reminders and H7 digest / weekly report are out of scope for this build)
 
 ---
 
@@ -1162,6 +1162,31 @@ fall:
 - **How to test**: `uv run pytest -q tests/integration/test_tts.py tests/integration/test_pages.py`; manual: switch voices in the elder app.
 - **Notes**: verified in the browser with the real model (male mp3 returned). Browsers that loaded the elder app before this change need a hard refresh (static files are not versioned).
 
+### H13 (P0): No medical advice ✅
+- **Owner**: A
+- **Goal**: the companion never gives medical advice, even when asked: no causes, diagnoses or "it's nothing serious", no medicines, doses or supplements, no treatments or home remedies. It listens, and points her to her doctor. Emergencies still get "call 911 now".
+- **Design**: two layers. `companion.txt` ("Health: you never give medical advice", with a "What can I take?" example) and `daily_summary.txt`. Then `guard_medical_advice` in `chat/postprocess.py`, a deterministic check run on every reply and greeting. It covers medicine names, doses, "take / stop / double your pills", ice / heat / compresses and similar remedies, and diagnosis or reassurance phrases, in English and Chinese. A reply that trips it is replaced with a safe line in the same language. Replies that mention 911 / 急救 are never replaced, and neither are reminder questions like "Did you take your pills?".
+- **Files**: `config/prompts/companion.txt`, `config/prompts/daily_summary.txt`, `chat/postprocess.py`, `chat/service.py`, `tests/unit/test_postprocess.py`, `tests/unit/test_context.py`.
+- **Acceptance**: "Try taking some ibuprofen", "put some ice on it", "200 mg", "sounds like arthritis", "建议你吃点止痛药", "热敷一下" are all replaced; ordinary caring replies, reminders and the 911 reply pass unchanged.
+- **How to test**: `uv run pytest -q tests/unit/test_postprocess.py`.
+- **Notes**: with the real model, "What should I take for it? Is ibuprofen okay?" gets "I can't give medical advice, but your doctor is the best person to ask" from the prompt alone.
+
+### H14 (P0): Ask before sharing ✅
+- **Owner**: A
+- **Goal**: when she mentions a symptom or a personal matter (money, family quarrels, a friend's troubles, secrets), the companion asks whether it may tell her family. Until she says yes, the family sees none of it. Each subject is asked about once and her answer is remembered. Red flags never wait (ADR 19).
+- **Design** (ADR 23): `share_consent` holds one row per subject: `symptom:<canonical>` for non-red-flag symptoms, `topic:<subject>` for personal matters. Its decision is `pending | share | private`. `message.consent_keys` records which subjects a held message waits on. `consent.py` runs in the pipeline after symptoms and before memory, and makes one extraction call (`extract_consent.txt`) that returns personal topics and her answer to a pending question. Her answer is applied first; an empty answer applies to the question just asked. The message and the companion's reply are then held (`private = true`) when any of their subjects is not shared. A "yes" releases held messages whose subjects are now all shared, along with the memory items first seen in them. Symptom mentions, alerts, the summary and reports follow `message.private` through `privacy.py`, so nothing else changed there. Non-red-flag alerts are pushed over SSE only after the consent step and only if visible; red-flag alerts are pushed immediately. "Keep this between us" (H4) still marks messages private for good: `mark_private` clears their consent keys. The companion sees her choices in the "Her sharing choices" section of `companion.txt`. The first-chat disclosure now says it will always ask before telling the family anything personal. `privacy.ask_before_sharing` (`ASK_BEFORE_SHARING`) switches the whole feature off.
+- **Family view**: a held message shows "Not shared: Maggie hasn't said yet whether to share this" (`awaiting_consent`) or "Kept private at Maggie's request". The private-day note now reads "Part of today's conversation is not shared: … chose to keep it private or has not said yet whether to share it."
+- **Files**: `consent.py`, `config/prompts/extract_consent.txt`, `config/prompts/companion.txt`, `models.py`, `privacy.py`, `pipeline.py`, `symptoms/service.py`, `chat/context.py`, `chat/service.py`, `settings.py`, `config/settings.yaml`, `config/mock_llm.yaml`, `web/app.py`, `web/deps.py`, `web/routes/family.py`, `web/static/family.js`, `tests/integration/test_share_consent.py`, `tests/integration/test_demo_script.py`.
+- **Acceptance**:
+  - "My knee hurts again." → nothing on the dashboard, and `share_consent` has `symptom:joint_pain = pending` → "Yes, you can tell her." → the knee pain and both messages appear.
+  - Once she has agreed, a later knee mention shows right away, and the companion's context says not to ask again.
+  - "No, don't tell them." → the subject stays hidden for good, including later mentions and the "no" itself.
+  - A money worry is held until she says yes.
+  - Chest pain → high alerts are pushed immediately and no consent row is created.
+  - A severe (medium) knee alert is not pushed until she says yes.
+- **How to test**: `uv run pytest -q tests/integration/test_share_consent.py tests/integration/test_demo_script.py`.
+- **Notes**: checked with the real model on a throwaway DB (EN + ZH): dizziness, knee pain, poor sleep and "son asking for money" were each held, then released on "yes" or kept private on "no". The model usually asks the sharing question the first time a subject comes up, but sometimes asks a detail question first and asks about sharing on the next turn; the subject stays hidden in the meantime. The extra extraction call runs in the background.
+
 ---
 
 ## Stage G: Wrap-up (goal: a stable, well-told demo)
@@ -1199,12 +1224,13 @@ fall:
 | # | Action | Expected |
 |---|---|---|
 | 1 | Open the elder app and tap "Start chatting" | AI greets by time of day and asks how the orchid repotting went (seed) |
-| 2 | Elder: "My knee's much better, but I didn't sleep well last night." | AI asks about sleep; `insomnia` is added on the dashboard |
-| 3 | Elder: "这两天早上起来头有点晕" ("I've been a bit dizzy in the mornings these past two days") | AI asks for details; `dizziness` appears on the dashboard timeline |
+| 2 | Elder: "My knee's much better, but I didn't sleep well last night." | AI asks whether to let Amy know; the dashboard shows "Not shared: Maggie hasn't said yet …" and no `insomnia` |
+| 2b | Elder: "Yes, you can tell her." | `insomnia` and the conversation appear on the dashboard (H14) |
+| 3 | Elder: "这两天早上起来头有点晕" ("I've been a bit dizzy in the mornings these past two days"), then "可以，告诉她吧" | AI asks whether to tell Amy; after "yes" `dizziness` appears on the dashboard timeline |
 | 4 | Elder: "My friend Linda got bad news from her doctor. Keep this between us, okay?" | AI agrees and gives the short safety disclosure; nothing about Linda anywhere on the dashboard |
 | 5 | Elder: "My chest feels tight and I can't catch my breath" | AI reassures and suggests contacting family / 911; a **high** alert pops up on the dashboard |
 | 6 | Switch to the dashboard and play the fall video | Detection view shows FALLING → DOWN; fall alert + snapshot pops up |
-| 7 | Refresh today's summary on the dashboard | Summary covers sleep, dizziness, and the chest-tightness alert, plus "asked to keep part of today's conversation private" |
+| 7 | Refresh today's summary on the dashboard | Summary covers sleep, dizziness, and the chest-tightness alert, plus "Part of today's conversation is not shared" |
 | 8 | Switch to Ben (`?member=ben`), claim the chest alert: "I'll call her doctor"; open the doctor one-pager and Maggie's stories | Amy's view shows "Ben is handling this"; one-pager lists symptoms with exact words; memoir shows her teaching story |
 | 9 | Dashboard "Ask AI": "Did Mom fall today? Anything else I should know?" (E5) | Answer cites the fall time + symptoms (no Linda); tool_calls are shown |
 | 10 | Switch to Claude Desktop and ask the same question (F8) | Returns events and snapshots via fall-mcp — showing the capability is reusable |
@@ -1268,3 +1294,4 @@ fall:
 | 20 | Reminders and follow-ups share one agenda, carried only by the greeting with a budget of 3 | Inject everything into every turn | Deterministic delivery status; never interrupts; avoids the checklist feel |
 | 21 | Doctor one-pager is rendered from structured data without an LLM | LLM-written summary | Doctors need exact words and dates; nothing can be invented |
 | 22 | Family view of the conversation = redacted copy (`message.family_text`, LLM pass + regex rules always), original kept for the companion | Redact before saving; regex only; show the family summaries only | The AI keeps her words; rules give a deterministic floor even when the model is down; the family still sees what she actually talked about |
+| 23 | Ask before sharing: symptoms and personal matters are held from the family (`message.private`) until she says yes; the choice is remembered per subject in `share_consent`; red flags never wait | Show everything unless she says "keep this between us"; ask about every mention | "Remembered, not monitored": the family only sees what she chose to share; asking once per subject avoids nagging; reusing `message.private` keeps one read path (ADR 18) |
