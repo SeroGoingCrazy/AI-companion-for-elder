@@ -4,7 +4,10 @@ An AI companion agent for older adults living alone, plus a care dashboard for t
 
 - **Elder app** (`/elder`): voice-first chat companion — hold to talk, replies are read aloud.
 - **Symptom log**: symptoms mentioned in casual conversation are extracted automatically; red-flag symptoms alert the family in real time.
-- **Family dashboard** (`/family`): daily summary, symptom timeline, alerts, live fall-detection view.
+- **Companion memory**: remembers small life details ("I'll repot my orchid this week") and asks about them in a later greeting.
+- **Parent-controlled privacy**: "keep this between us" hides that part from every family view, while the companion still remembers it; urgent safety alerts (a fall, chest pain) always go through, and the parent is told so up front.
+- **Family dashboard** (`/family`): daily summary, symptom timeline, alerts, live fall-detection view, "on her mind" care list, and sibling sharing (`?member=ben`, "I'll handle this").
+- **Reports**: a printable doctor one-pager (`/family/doctor`, built without an LLM) and a memoir of her stories (`/family/memoir`).
 - **fall-mcp**: YOLO11-pose fall detection exposed as an MCP server (usable from the dashboard agent, Claude Desktop, Cursor), with real-time push alerts.
 
 > This product does not provide medical diagnosis.
@@ -19,6 +22,20 @@ Requires [uv](https://docs.astral.sh/uv/) and Python 3.12.
 uv sync
 cp .env.example .env   # then set OPENAI_API_KEY
 uv run pytest -q
+```
+
+Run the app offline with seeded demo data (6 days of history, family members Amy and Ben):
+
+```bash
+LLM_PROVIDER=mock uv run python -m elder_companion.seed --reset --with-history
+LLM_PROVIDER=mock uv run elder-web     # http://127.0.0.1:8000/elder and /family
+```
+
+Extraction evals (need `OPENAI_API_KEY`):
+
+```bash
+uv run python eval/run_extraction_eval.py
+uv run python eval/run_memory_eval.py
 ```
 
 ## Fall detection (fall-mcp)
@@ -51,10 +68,11 @@ MCP: Streamable HTTP at `http://127.0.0.1:8001/mcp`, or stdio for Claude Desktop
 
 ```
 config/                 settings, symptom catalog, prompts
-src/elder_companion/    main web app: chat, voice, symptom log, alerts, family dashboard
+src/elder_companion/    main web app: chat, voice, symptom log, alerts, companion memory, privacy,
+                        agenda, family dashboard, doctor one-pager and memoir
 src/fall_detector/      fall-mcp: pose estimation, fall state machine, MCP tools, MJPEG stream
 tests/                  unit / integration tests (offline, mock LLM)
-eval/                   symptom extraction eval set
+eval/                   symptom and memory extraction eval sets
 demo/                   demo videos and script
 scripts/                fetch_demo_media.py (model + clips)
 docs/                   mcp_desktop.md (Claude Desktop setup)
