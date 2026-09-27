@@ -21,7 +21,7 @@ from elder_companion.chat.context import (
     greeting_language,
     part_of_day,
 )
-from elder_companion.chat.postprocess import tidy_reply
+from elder_companion.chat.postprocess import guard_medical_advice, tidy_reply
 from elder_companion.db import utcnow
 from elder_companion.elders import get_elder
 from elder_companion.llm import BaseLLMClient, LLMError
@@ -102,6 +102,7 @@ class ChatService:
         )
         try:
             reply = tidy_reply(self._llm.chat(messages, max_tokens=self._s.max_reply_tokens))
+            reply = guard_medical_advice(reply)
             fallback = False
         except LLMError:
             logger.warning("chat LLM call failed; using fallback reply", exc_info=True)
@@ -149,6 +150,7 @@ class ChatService:
         )
         try:
             reply = tidy_reply(self._llm.chat(messages, max_tokens=self._s.max_reply_tokens))
+            reply = guard_medical_advice(reply)
             fallback = False
         except LLMError:
             logger.warning("greet LLM call failed; using fallback greeting", exc_info=True)
