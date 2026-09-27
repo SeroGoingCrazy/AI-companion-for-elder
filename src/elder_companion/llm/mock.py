@@ -115,7 +115,7 @@ class MockLLMClient(BaseLLMClient):
             return audio[len(MOCK_AUDIO_PREFIX) :].decode("utf-8").strip()
         return self.config.get("transcribe", {}).get("default", "")
 
-    def tts(self, text: str) -> bytes:
+    def tts(self, text: str, *, voice: str | None = None) -> bytes:
         self.calls.append(("tts", text))
         # available: false makes the app answer 204, so the browser speaks with its own voice.
         if not self.config.get("tts", {}).get("available", True):

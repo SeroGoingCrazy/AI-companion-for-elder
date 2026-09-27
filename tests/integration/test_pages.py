@@ -17,7 +17,10 @@ def test_elder_page_renders_persona_and_config(client: TestClient) -> None:
     assert "<title>Sunny</title>" in html
     assert "Hello, Maggie!" in html
     assert 'id="mic-btn"' in html
-    assert 'window.APP_CONFIG = {"elderId": 1, "nickname": "Maggie"}' in html
+    assert (
+        'window.APP_CONFIG = {"elderId": 1, "nickname": "Maggie", "voices": ["female", "male"]}'
+        in html
+    )
     assert "call 911" in html
 
 

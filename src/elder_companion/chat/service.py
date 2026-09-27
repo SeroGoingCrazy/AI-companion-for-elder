@@ -164,18 +164,19 @@ class ChatService:
         self._session.commit()
         return ChatResult(assistant_msg.id, "", reply, fallback)
 
-    def synthesize(self, message_id: int) -> Path | None:
-        """Return a cached mp3 for an assistant message, generating it once. None if TTS fails."""
+    def synthesize(self, message_id: int, voice: str | None = None) -> Path | None:
+        """Return a cached mp3 for an assistant message, generating it once per voice (None =
+        the configured default). None if TTS fails."""
         if self._audio_dir is None:
             raise RuntimeError("ChatService was created without an audio_dir")
         msg = self._session.get(Message, message_id)
         if msg is None or msg.role != "assistant":
             raise MessageNotFound(message_id)
-        path = self._audio_dir / f"{msg.id}.mp3"
+        path = self._audio_dir / (f"{msg.id}.{voice}.mp3" if voice else f"{msg.id}.mp3")
         if path.exists():
             return path
         try:
-            data = self._llm.tts(msg.text)
+            data = self._llm.tts(msg.text, voice=voice)
         except LLMError:
             logger.warning("TTS failed for message %s; client falls back to text", msg.id)
             return None

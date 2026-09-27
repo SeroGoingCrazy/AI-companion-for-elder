@@ -92,7 +92,7 @@ class MessageOut(BaseModel):
 
     id: int
     role: str
-    text: str  # "" when private
+    text: str  # "" when private; personal details scrubbed otherwise
     private: bool = False
     created_at: UtcDateTime
 

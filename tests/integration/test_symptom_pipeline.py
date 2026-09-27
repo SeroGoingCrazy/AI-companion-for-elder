@@ -55,7 +55,12 @@ def _alerts(c: TestClient) -> list[Alert]:
 
 
 def _extract_calls(llm: MockLLMClient) -> list[dict]:
-    return [args for name, args in llm.calls if name == "extract_json"]
+    """Symptom / memory extraction calls (the family redaction pass is not extraction)."""
+    return [
+        args
+        for name, args in llm.calls
+        if name == "extract_json" and args["name"] != "family_redaction"
+    ]
 
 
 def test_dizziness_is_logged_without_alert(client: TestClient) -> None:
