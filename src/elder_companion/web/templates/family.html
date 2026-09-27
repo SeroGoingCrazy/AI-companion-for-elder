@@ -9,6 +9,15 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;700;800&display=swap">
   <link rel="stylesheet" href="/static/style.css">
+  <link rel="manifest" href="/manifest-family.webmanifest">
+  <meta name="apple-mobile-web-app-title" content="{{ companion_name }} Care">
+  <!-- iOS ignores the manifest: these three meta tags are what make "Add to Home Screen"
+       open full screen, and it only ever uses apple-touch-icon.png. -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <link rel="icon" href="/static/icons/icon-192.png" type="image/png">
 </head>
 <body class="family">
   <div id="alert-banner" class="alert-banner" role="alert" hidden>
@@ -101,5 +110,6 @@
 
   <script>window.APP_CONFIG = {{ app_config | tojson }};</script>
   <script src="/static/family.js" defer></script>
+  <script src="/static/pwa.js" defer></script>
 </body>
 </html>
