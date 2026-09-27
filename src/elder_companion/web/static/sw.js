@@ -9,7 +9,10 @@
  * be worse than no worker at all.
  */
 
-const VERSION = "sunny-v1";
+// Replaced at serve time with a digest of the files below (web/routes/pwa.py). A hand-kept
+// version number is the thing everyone forgets to bump, and a stale cache then serves the
+// previous build to every phone that has already opened the app once.
+const VERSION = "__BUILD__";
 const SHELL = `${VERSION}-shell`;
 const RUNTIME = `${VERSION}-runtime`;
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
@@ -12,7 +13,7 @@ from elder_companion.alerts.bus import StreamEvent
 from elder_companion.alerts.schemas import AlertIn, AlertOut
 from elder_companion.alerts.service import AlertNotFound, create_alert, list_alerts, mark_read
 from elder_companion.elders import ElderNotFound
-from elder_companion.i18n import LANG_COOKIE, resolve
+from elder_companion.i18n import LANG_COOKIE, resolve, strings
 from elder_companion.models import Alert, SymptomLog
 from elder_companion.symptoms.schema import get_catalog
 from elder_companion.web.deps import AlertBusDep, SessionDep
@@ -20,6 +21,19 @@ from elder_companion.web.deps import AlertBusDep, SessionDep
 router = APIRouter(prefix="/api/alerts", tags=["alerts"])
 
 SSE_PING_SECONDS = 15  # keeps proxies and the browser from dropping an idle stream
+
+
+def _fall_body(stored: str, t: dict[str, str]) -> str:
+    """Rebuild fall-mcp's sentence in `lang`.
+
+    fall_detector writes one fixed English sentence, optionally carrying how long the
+    person has been down. The stored text stays the record; the only thing recovered from
+    it is that number, which is why this reads it back out with a regex rather than
+    translating prose.
+    """
+    match = re.search(r"for (\d+)s", stored)
+    for_s = t["fall_alert_for"].format(n=match.group(1)) if match else ""
+    return t["fall_alert_body"].format(for_s=for_s)
 
 
 def _localized_title(session: Session, ref_id: str | None, lang: str) -> str | None:
@@ -45,6 +59,12 @@ def _localized(session: Session, alerts: list[Alert], lang: str) -> list[AlertOu
     out = [AlertOut.model_validate(a) for a in alerts]
     if lang == "en":
         return out
+
+    fall = strings(lang)["family"]
+    for item in out:
+        if item.type == "fall":
+            item.title = fall["fall_alert_title"]
+            item.content = _fall_body(item.content, fall)
 
     ref_ids = {int(a.ref_id) for a in alerts if a.type == "symptom" and (a.ref_id or "").isdigit()}
     if not ref_ids:
@@ -113,7 +133,13 @@ async def stream_alerts(request: Request, bus: AlertBusDep) -> EventSourceRespon
             payload = json.loads(data)
         except (TypeError, ValueError):
             return data
-        if payload.get("type") != "symptom":
+        kind = payload.get("type")
+        if kind == "fall":
+            fall = strings(lang)["family"]
+            payload["title"] = fall["fall_alert_title"]
+            payload["content"] = _fall_body(payload.get("content") or "", fall)
+            return json.dumps(payload)
+        if kind != "symptom":
             return data
         with sessionmaker() as session:
             title = _localized_title(session, payload.get("ref_id"), lang)

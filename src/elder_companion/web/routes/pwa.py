@@ -11,6 +11,8 @@ default scope is its own directory and it has to control both /elder and /family
 
 from __future__ import annotations
 
+import hashlib
+from functools import lru_cache
 from typing import Any
 
 from fastapi import APIRouter, Request, Response
@@ -93,10 +95,28 @@ def family_manifest(request: Request) -> JSONResponse:
     )
 
 
+@lru_cache(maxsize=1)
+def _build_id() -> str:
+    """A digest of everything the worker precaches.
+
+    The cache name is derived from the assets themselves so that changing a stylesheet
+    invalidates the old cache automatically. Cached in-process: the files do not change
+    while the server runs, and hashing them per request would be wasted work.
+    """
+    digest = hashlib.sha256()
+    static = WEB_DIR / "static"
+    for path in sorted(static.rglob("*")):
+        if path.is_file():
+            digest.update(path.relative_to(static).as_posix().encode())
+            digest.update(path.read_bytes())
+    return digest.hexdigest()[:12]
+
+
 @router.get("/sw.js")
 def service_worker() -> Response:
     """Serve the worker from the root so its scope covers /elder and /family."""
-    body = (WEB_DIR / "static" / "sw.js").read_bytes()
+    source = (WEB_DIR / "static" / "sw.js").read_text(encoding="utf-8")
+    body = source.replace("__BUILD__", f"sunny-{_build_id()}").encode()
     return Response(
         body,
         media_type="text/javascript",

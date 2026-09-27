@@ -54,60 +54,92 @@
       </div>
     </header>
 
-    <!-- 1. the one answer the reader came for -->
-    <section class="summary-card" aria-labelledby="summary-h">
-      <div class="card-head">
-        <h2 id="summary-h">{{ t.family.today }}</h2>
-        <button id="summary-refresh" type="button" class="btn btn-quiet">{{ t.family.refresh }}</button>
-      </div>
-      <p id="summary-text" class="summary-text">{{ t.family.loading }}</p>
-      <p id="summary-meta" class="meta"></p>
-    </section>
+    <!-- How is she today: the one answer the reader came for, then the week behind it. -->
+    <div id="panel-today" class="panel" role="tabpanel" aria-labelledby="tab-today">
+      <section class="summary-card" aria-labelledby="summary-h">
+        <div class="card-head">
+          <h2 id="summary-h">{{ t.family.today }}</h2>
+          <button id="summary-refresh" type="button" class="btn btn-quiet">{{ t.family.refresh }}</button>
+        </div>
+        <p id="summary-text" class="summary-text">{{ t.family.loading }}</p>
+        <p id="summary-meta" class="meta"></p>
+      </section>
 
-    <!-- 2. everything that happened, newest first -->
-    <section class="card alerts-card" aria-labelledby="alerts-h">
-      <h2 id="alerts-h">{{ t.family.alerts }} <span id="unread-count" class="count-badge" hidden></span></h2>
-      <ul id="alert-list" class="alert-list"></ul>
-      <p id="alerts-empty" class="empty" hidden>{{ t.family.no_alerts }}</p>
-    </section>
+      <section class="card symptoms-card" aria-labelledby="symptoms-h">
+        <h2 id="symptoms-h">{{ t.family.symptoms }}</h2>
+        <ul class="legend" aria-label="Legend">
+          <li class="sev-red_flag">{{ t.severity.red_flag }}</li>
+          <li class="sev-severe">{{ t.severity.severe }}</li>
+          <li class="sev-moderate">{{ t.severity.moderate }}</li>
+          <li class="sev-mild">{{ t.severity.mild }}</li>
+          <li class="sev-unknown">{{ t.severity.unknown }}</li>
+        </ul>
+        <ol id="timeline" class="timeline"></ol>
+      </section>
+    </div>
 
-    <section class="card symptoms-card" aria-labelledby="symptoms-h">
-      <h2 id="symptoms-h">{{ t.family.symptoms }}</h2>
-      <ul class="legend" aria-label="Legend">
-        <li class="sev-red_flag">{{ t.severity.red_flag }}</li>
-        <li class="sev-severe">{{ t.severity.severe }}</li>
-        <li class="sev-moderate">{{ t.severity.moderate }}</li>
-        <li class="sev-mild">{{ t.severity.mild }}</li>
-        <li class="sev-unknown">{{ t.severity.unknown }}</li>
-      </ul>
-      <ol id="timeline" class="timeline"></ol>
-    </section>
+    <!-- What happened: one merged stream, newest first, chat and falls together. -->
+    <div id="panel-alerts" class="panel" role="tabpanel" aria-labelledby="tab-alerts" hidden>
+      <section class="card alerts-card" aria-labelledby="alerts-h">
+        <h2 id="alerts-h">{{ t.family.alerts }} <span id="unread-count" class="count-badge" hidden></span></h2>
+        <ul id="alert-list" class="alert-list"></ul>
+        <p id="alerts-empty" class="empty" hidden>{{ t.family.no_alerts }}</p>
+      </section>
+    </div>
 
-    <!-- 3. supporting detail, on demand -->
-    <section class="card fall-card" aria-labelledby="fall-h">
-      <div class="card-head">
-        <h2 id="fall-h">{{ t.family.fall_title }}</h2>
-        <span id="fall-status" class="meta">{{ t.family.connecting }}</span>
-      </div>
-      <div class="fall-view">
-        <img id="fall-stream" alt="{{ t.family.fall_title }}" hidden>
-        <p id="fall-offline" class="fall-offline">{{ t.family.fall_offline }}</p>
-      </div>
-    </section>
+    <!-- Let me look: the live camera. -->
+    <div id="panel-monitor" class="panel" role="tabpanel" aria-labelledby="tab-monitor" hidden>
+      <section class="card fall-card" aria-labelledby="fall-h">
+        <div class="card-head">
+          <h2 id="fall-h">{{ t.family.fall_title }}</h2>
+          <span id="fall-status" class="meta">{{ t.family.connecting }}</span>
+        </div>
+        <div class="fall-view">
+          <img id="fall-stream" alt="{{ t.family.fall_title }}" hidden>
+          <p id="fall-offline" class="fall-offline">{{ t.family.fall_offline }}</p>
+        </div>
+      </section>
+    </div>
 
-    <section class="card history-card">
-      <details id="history">
-        <summary><h2>{{ t.family.conversation }}</h2> <span id="history-meta" class="meta"></span></summary>
-        <button id="history-older" type="button" class="btn btn-quiet history-older" hidden>{{ t.family.load_earlier }}</button>
-        <ol id="history-list" class="history-list"></ol>
-      </details>
-    </section>
+    <!-- What did she say: the transcript, for when the summary is not enough. -->
+    <div id="panel-chat" class="panel" role="tabpanel" aria-labelledby="tab-chat" hidden>
+      <section class="card history-card">
+        <details id="history" open>
+          <summary><h2>{{ t.family.conversation }}</h2> <span id="history-meta" class="meta"></span></summary>
+          <button id="history-older" type="button" class="btn btn-quiet history-older" hidden>{{ t.family.load_earlier }}</button>
+          <ol id="history-list" class="history-list"></ol>
+        </details>
+      </section>
+    </div>
 
     <footer class="dash-footer">{{ t.family.ai_note.format(nickname=elder.nickname) }}</footer>
   </main>
 
+  <nav class="tabbar" role="tablist" aria-label="{{ t.family.title.format(nickname=elder.nickname) }}">
+    <button id="tab-today" type="button" role="tab" aria-selected="true" aria-controls="panel-today" data-panel="today">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg>
+      {{ t.family.tab_today }}
+    </button>
+    <button id="tab-alerts" type="button" role="tab" aria-selected="false" aria-controls="panel-alerts" data-panel="alerts">
+      <span class="tab-wrap">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 10a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5h-15S6 14 6 10Z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>
+        <span id="tab-badge" class="tab-dot" hidden></span>
+      </span>
+      {{ t.family.tab_alerts }}
+    </button>
+    <button id="tab-monitor" type="button" role="tab" aria-selected="false" aria-controls="panel-monitor" data-panel="monitor">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="m16 11 5-3v8l-5-3z"/></svg>
+      {{ t.family.tab_monitor }}
+    </button>
+    <button id="tab-chat" type="button" role="tab" aria-selected="false" aria-controls="panel-chat" data-panel="chat">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a7.5 7.5 0 0 1-11 6.6L4 20l1.5-4.3A7.5 7.5 0 1 1 20 12Z"/></svg>
+      {{ t.family.tab_chat }}
+    </button>
+  </nav>
+
   <script>window.APP_CONFIG = {{ app_config | tojson }};</script>
   <script src="/static/lang.js" defer></script>
+  <script src="/static/tabs.js" defer></script>
   <script src="/static/family.js" defer></script>
   <script src="/static/pwa.js" defer></script>
 </body>

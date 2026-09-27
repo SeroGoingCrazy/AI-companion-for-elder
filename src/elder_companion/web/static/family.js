@@ -131,6 +131,11 @@
     const unread = list.filter((a) => !a.is_read).length;
     $("unread-count").hidden = unread === 0;
     $("unread-count").textContent = window.fmt(S.unread, { n: unread });
+    const badge = $("tab-badge");
+    if (badge) {
+      badge.hidden = unread === 0;
+      badge.textContent = unread > 9 ? "9+" : String(unread);
+    }
     document.title = `${unread ? `(${unread}) ` : ""}${cfg.nickname}'s day`;
   }
 
@@ -340,7 +345,9 @@
 
   function connectFallStream() {
     const img = $("fall-stream");
-    const url = `${location.protocol}//${location.hostname}:${cfg.fallStreamPort}/stream`;
+    // Same origin, proxied by the app (web/routes/fall_proxy.py): a phone cannot reach
+    // fall-mcp's port directly, and over HTTPS an http://host:8001 image is mixed content.
+    const url = "/fall/stream";
     img.onload = () => {
       img.hidden = false;
       $("fall-offline").hidden = true;

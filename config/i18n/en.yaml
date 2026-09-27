@@ -38,6 +38,10 @@ family:
   sound_on: Sound on
   sound_off: Sound off
   today: Today
+  tab_today: Today
+  tab_alerts: Alerts
+  tab_monitor: Camera
+  tab_chat: Chat
   refresh: Refresh
   updating: Updating…
   updated: "Updated {time}"
@@ -53,6 +57,9 @@ family:
   watch: Watch
   from_chat: From chat
   from_fall: Fall detection
+  fall_alert_title: Fall detected
+  fall_alert_body: "Someone fell and has stayed on the floor{for_s}. Please check on them."
+  fall_alert_for: " for {n}s"
   snapshot_alt: Snapshot at the time of the fall
   symptoms: "Symptoms, past 7 days"
   nothing_mentioned: Nothing mentioned

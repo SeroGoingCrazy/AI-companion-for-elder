@@ -214,3 +214,80 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* ---------- bottom tab bar ----------
+ *
+ * Added because the dashboard read as a web page on a phone: one long scroll, no way to
+ * get anywhere without swiping past everything. Care apps that ship — Oura's Today /
+ * Vitals / My Health, ElliQ's Dashboard / Notifications / Reminders — all put a small
+ * fixed set of destinations at the bottom, within thumb reach, and that bar is the single
+ * strongest signal that a page is an app rather than a document.
+ *
+ * Four destinations, mapped onto what the family actually comes for: how is she, what
+ * happened, let me look, what did she say.
+ */
+
+.dash { padding-bottom: calc(var(--tabbar-h) + 26px); }
+
+:root { --tabbar-h: 62px; }
+
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  background: color-mix(in srgb, var(--paper-lift) 92%, transparent);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  border-top: 1px solid var(--rule);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.tabbar button {
+  appearance: none; border: 0; background: none; cursor: pointer;
+  min-height: var(--tabbar-h); padding: 7px 4px 5px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  font-family: var(--face-ui); font-size: 12px; font-weight: 700; color: var(--ink-3);
+  -webkit-tap-highlight-color: transparent;
+}
+.tabbar button svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 1.9;
+                     stroke-linecap: round; stroke-linejoin: round; }
+.tabbar button[aria-selected="true"] { color: var(--amber-deep); }
+.tabbar .tab-dot {
+  position: absolute; transform: translate(13px, -11px);
+  min-width: 17px; height: 17px; padding: 0 4px; border-radius: var(--r-chip);
+  background: var(--alarm); color: #fff; font-size: 11px; line-height: 17px; text-align: center;
+}
+.tab-wrap { position: relative; display: inline-flex; }
+
+/* Panels are swapped rather than scrolled past. */
+.panel[hidden] { display: none !important; }
+.panel { display: flex; flex-direction: column; gap: 22px; }
+
+/* The tab bar owns navigation on a phone; on a laptop there is room for everything at
+   once, so the panels stack and the bar gets out of the way. */
+@media (min-width: 860px) {
+  .tabbar { display: none; }
+  .dash { padding-bottom: 40px; max-width: 820px; }
+  .panel[hidden] { display: flex !important; }
+}
+
+/* ---------- alert snapshots ----------
+ *
+ * The fall snapshot arrives at the camera's own resolution (640x480). Unconstrained it
+ * pushed the page wider than the viewport, which on a phone meant the whole layout could
+ * be dragged sideways and the fixed tab bar went off-screen with it — the buttons looked
+ * dead because they were no longer where the thumb was. This rule is the one the deleted
+ * stylesheet used to carry.
+ */
+.alert-item img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  margin-top: 9px;
+  border-radius: var(--r-card);
+  background: var(--paper);
+}
+.alert-item > img { grid-column: 2 / -1; }
+
+/* Nothing in the page may exceed the viewport: a horizontal scroll moves the fixed tab
+   bar out from under the thumb, and on a phone that reads as "the app is broken". */
+.dash, .card, .alert-item { max-width: 100%; min-width: 0; }
+.card img, .card video { max-width: 100%; }

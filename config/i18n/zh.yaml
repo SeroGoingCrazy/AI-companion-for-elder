@@ -38,6 +38,10 @@ family:
   sound_on: 提示音开
   sound_off: 提示音关
   today: 今天
+  tab_today: 今天
+  tab_alerts: 提醒
+  tab_monitor: 监控
+  tab_chat: 聊天
   refresh: 刷新
   updating: 更新中…
   updated: "{time} 更新"
@@ -53,6 +57,9 @@ family:
   watch: 留意
   from_chat: 来自聊天
   from_fall: 跌倒检测
+  fall_alert_title: 检测到跌倒
+  fall_alert_body: "有人摔倒后{for_s}没有起身，请尽快去看看。"
+  fall_alert_for: "已经 {n} 秒"
   snapshot_alt: 跌倒发生时的画面
   symptoms: 近 7 天症状
   nothing_mentioned: 没有提到不适
