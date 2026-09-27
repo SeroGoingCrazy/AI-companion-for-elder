@@ -37,11 +37,14 @@ def test_tab_bar_sits_above_content(client: TestClient) -> None:
 
 
 def test_every_tab_has_a_panel(client: TestClient) -> None:
+    """Whatever the tab bar offers must exist; the set grows as features land, so this
+    checks the pairing rather than a fixed list."""
     html = client.get("/family").text
     tabs = set(re.findall(r'data-panel="([a-z]+)"', html))
-    assert tabs == {"today", "alerts", "monitor", "chat"}
-    for name in tabs:
-        assert f'id="panel-{name}"' in html, name
+    panels = set(re.findall(r'id="panel-([a-z]+)"', html))
+    assert tabs, "no tabs found"
+    assert tabs == panels, f"tabs without panels: {tabs - panels}; orphan panels: {panels - tabs}"
+    assert "today" in tabs
 
 
 def test_tabs_are_deep_linkable(client: TestClient) -> None:

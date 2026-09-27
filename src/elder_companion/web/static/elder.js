@@ -2,6 +2,7 @@
  *
  * Flow per turn: record -> POST /api/chat/audio -> show reply text -> GET /api/tts/{id} -> play.
  * If TTS is unavailable (204) or fails, the browser's own speech synthesis reads the reply.
+ * The voice switch (woman / man) is remembered on this device and sent as ?voice=.
  */
 (() => {
   "use strict";
@@ -18,6 +19,7 @@
     typeInstead: document.querySelector(".type-instead"),
     textForm: $("text-form"),
     textInput: $("text-input"),
+    voiceSwitch: $("voice-switch"),
   };
 
   // Server-rendered strings for the chosen language (config/i18n/<lang>.yaml).
@@ -64,6 +66,24 @@
   let audioCtx = null;
   let meter = null; // { source, timer } while recording
   let peakLevel = 0;
+  let lastReply = null; // { id, text } of the latest reply, replayed when the voice changes
+
+  // ---------- voice switch ----------
+
+  const VOICE_KEY = "elder.voice";
+  const voices = cfg.voices || ["female", "male"];
+  let voice = voices[0];
+  try {
+    const saved = localStorage.getItem(VOICE_KEY);
+    if (voices.includes(saved)) voice = saved;
+  } catch { /* storage blocked */ }
+
+  function renderVoice() {
+    for (const b of els.voiceSwitch.querySelectorAll("button")) {
+      b.hidden = !voices.includes(b.dataset.voice);
+      b.setAttribute("aria-pressed", String(b.dataset.voice === voice));
+    }
+  }
 
   // Timings for latency checks: window.__timings in the console.
   window.__timings = [];
@@ -169,6 +189,8 @@
       };
       const u = new SpeechSynthesisUtterance(text);
       u.lang = langOf(text) === "zh" ? "zh-CN" : "en-US";
+      const v = browserVoice(u.lang);
+      if (v) u.voice = v;
       u.rate = 0.9;
       u.onend = done;
       u.onerror = done;
@@ -177,25 +199,40 @@
     });
   }
 
+  // Browser voices have no gender field; guess from well-known voice names.
+  const MALE_NAMES = /(male|man|david|mark|guy|james|george|daniel|alex|fred|tom|aaron|kangkang|yunxi|yunyang)/i;
+  const FEMALE_NAMES = /(female|woman|zira|aria|jenny|samantha|victoria|karen|susan|hazel|huihui|xiaoxiao|yaoyao|tingting)/i;
+  function browserVoice(lang) {
+    const want = voice === "male" ? MALE_NAMES : FEMALE_NAMES;
+    const base = lang.slice(0, 2);
+    const all = window.speechSynthesis.getVoices().filter((v) => v.lang.startsWith(base));
+    return all.find((v) => want.test(v.name)) || null;
+  }
+
+  let playSeq = 0; // a newer playReply (voice switch) supersedes the one in flight
+
   async function playReply(messageId, text) {
+    lastReply = { id: messageId, text };
+    const seq = ++playSeq;
+    const current = () => state === "speaking" && seq === playSeq;
     setStatus("speaking");
     const t0 = performance.now();
     try {
-      const res = await fetch(`/api/tts/${messageId}`, { cache: "no-cache" });
-      if (state !== "speaking") return; // she started talking again meanwhile
+      const res = await fetch(`/api/tts/${messageId}?voice=${encodeURIComponent(voice)}`, { cache: "no-cache" });
+      if (!current()) return; // she started talking again meanwhile
       if (res.status === 200) {
         const blob = await res.blob();
         logTiming("tts audio", t0);
-        if (state !== "speaking") return;
+        if (!current()) return;
         await playBlob(blob);
       } else {
         await speakWithBrowser(text);
       }
     } catch (err) {
       console.warn("TTS failed, using browser voice", err);
-      if (state === "speaking") await speakWithBrowser(text);
+      if (current()) await speakWithBrowser(text);
     }
-    if (state === "speaking") setStatus("idle");
+    if (current()) setStatus("idle");
   }
 
   async function showReply(data) {
@@ -383,6 +420,20 @@
       tapMode = true;
       pressing = false;
       startRecording();
+    }
+  });
+
+  renderVoice();
+  els.voiceSwitch.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-voice]");
+    if (!b || b.dataset.voice === voice) return;
+    voice = b.dataset.voice;
+    try { localStorage.setItem(VOICE_KEY, voice); } catch { /* storage blocked */ }
+    renderVoice();
+    // Let her hear the new voice right away: replay the latest reply.
+    if (lastReply && (state === "idle" || state === "speaking")) {
+      stopSpeaking();
+      playReply(lastReply.id, lastReply.text);
     }
   });
 

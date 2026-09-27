@@ -24,6 +24,9 @@ elder:
   not_caught: 抱歉，我没太听清，您能再说一遍吗？
   failed: 抱歉，出了点问题，请再试一次。
   type_instead: 改用打字
+  voice_group: "{companion}的声音"
+  voice_female: 女声
+  voice_male: 男声
   your_message: 您要说的话
   placeholder: 在这里打字…
   send: 发送
@@ -42,6 +45,25 @@ family:
   tab_alerts: 提醒
   tab_monitor: 监控
   tab_chat: 聊天
+  viewing_as: 当前身份
+  report_weekly: 周报
+  report_doctor: 就诊单页
+  report_memoir: "{nickname}的故事"
+  care_title: "{nickname}常挂在心上的"
+  care_intro: 她反复提起的人和事。
+  care_empty: 暂时还没有。她多次提到的人和话题会出现在这里。
+  reminders: 提醒事项
+  reminders_window: 近 7 天
+  reminders_intro: "{companion}会在{nickname}下次聊天时，用你的原话提起这些。"
+  reminders_empty: 还没有提醒，在下面添加一条。
+  reminder_label: "想让{companion}提醒什么？"
+  reminder_placeholder: "例如：早饭后吃降压药"
+  reminder_daily: 每天
+  reminder_once: 仅一次
+  reminder_add: 添加提醒
+  reminders_note: "{companion}只会重复你的原话，不会自行添加剂量或医疗建议。"
+  privacy_note: "当{nickname}要求某件事保密时，它不会出现在这个页面上，紧急安全告警除外。"
+  tab_care: 关心
   refresh: 刷新
   updating: 更新中…
   updated: "{time} 更新"

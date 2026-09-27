@@ -15,7 +15,7 @@ from elder_companion.alerts.schemas import AlertIn, AlertLevel, AlertOut
 from elder_companion.alerts.service import last_symptom_alert_at
 from elder_companion.db import utcnow
 from elder_companion.llm import ChatMessage, LLMError
-from elder_companion.models import Alert, Elder, Message, SymptomLog
+from elder_companion.models import Alert, Elder, Message, SymptomLog, SymptomMention
 from elder_companion.settings import SymptomSettings
 from elder_companion.symptoms.extractor import SymptomExtractor
 from elder_companion.symptoms.merge import find_match, merge_symptom
@@ -116,6 +116,16 @@ class SymptomService:
             for key, value in result.values.items():
                 setattr(row, key, value)
         self._session.flush()  # assigns row.id for the alert's ref_id
+        # One row per occurrence: the family view counts and quotes only visible ones.
+        self._session.add(
+            SymptomMention(
+                symptom_log_id=row.id,
+                message_id=msg.id,
+                raw_quote=item.raw_quote,
+                severity=item.severity,
+                created_at=now,
+            )
+        )
         return row
 
     def _alert(
@@ -132,22 +142,28 @@ class SymptomService:
             type="symptom", level=level, title=title, content=content, ref_id=str(row.id)
         )
         # created_at uses the service clock so debounce comparisons stay consistent.
-        alert = Alert(**data.model_dump(exclude={"elder_id"}), elder_id=elder.id, created_at=now)
+        alert = Alert(
+            **data.model_dump(exclude={"elder_id"}),
+            elder_id=elder.id,
+            message_id=msg.id,
+            created_at=now,
+        )
         self._session.add(alert)
         self._session.flush()
         return alert
 
 
-def process_message_symptoms(
+def run_symptom_pipeline(
     session_factory: sessionmaker[Session],
     extractor: SymptomExtractor,
     settings: SymptomSettings,
     bus: AlertBus | None,
     message_id: int,
-) -> list[AlertOut]:
-    """Background task after a chat turn. Never raises: a failure here must not affect chat.
-    Publishes each new alert, then an `activity` event (also after a failed extraction: the
-    message itself is new for the dashboard's history)."""
+    publish_now: Callable[[AlertOut], bool] | None = None,
+) -> tuple[list[AlertOut], int]:
+    """Extract, merge and alert; publish each new alert right away (only those `publish_now`
+    accepts, when given: the caller publishes the rest). Never raises.
+    Returns (alerts, number of symptom rows touched)."""
     outs: list[AlertOut] = []
     symptoms = 0
     try:
@@ -161,6 +177,22 @@ def process_message_symptoms(
         logger.exception("symptom pipeline crashed for message %s", message_id)
     if bus is not None:
         for out in outs:
-            bus.publish(StreamEvent.alert(out))
+            if publish_now is None or publish_now(out):
+                bus.publish(StreamEvent.alert(out))
+    return outs, symptoms
+
+
+def process_message_symptoms(
+    session_factory: sessionmaker[Session],
+    extractor: SymptomExtractor,
+    settings: SymptomSettings,
+    bus: AlertBus | None,
+    message_id: int,
+) -> list[AlertOut]:
+    """Background task after a chat turn. Never raises: a failure here must not affect chat.
+    Publishes each new alert, then an `activity` event (also after a failed extraction: the
+    message itself is new for the dashboard's history)."""
+    outs, symptoms = run_symptom_pipeline(session_factory, extractor, settings, bus, message_id)
+    if bus is not None:
         bus.publish(StreamEvent.activity(message_id, symptoms))
     return outs

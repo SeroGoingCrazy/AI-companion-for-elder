@@ -80,8 +80,8 @@ def test_cache_version_follows_the_assets(client: TestClient) -> None:
     before = version(client)
     assert version(client) == before, "stable while nothing changes"
 
-    from elder_companion.web.routes.pwa import _build_id
     from elder_companion.web.routes.pages import WEB_DIR
+    from elder_companion.web.routes.pwa import _build_id
 
     probe = WEB_DIR / "static" / "_version_probe.tmp"
     probe.write_text("x", encoding="utf-8")

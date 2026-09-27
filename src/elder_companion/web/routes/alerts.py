@@ -11,10 +11,11 @@ from sse_starlette import EventSourceResponse, ServerSentEvent
 
 from elder_companion.alerts.bus import StreamEvent
 from elder_companion.alerts.schemas import AlertIn, AlertOut
-from elder_companion.alerts.service import AlertNotFound, create_alert, list_alerts, mark_read
+from elder_companion.alerts.service import AlertNotFound, create_alert, mark_read
 from elder_companion.elders import ElderNotFound
 from elder_companion.i18n import LANG_COOKIE, resolve, strings
-from elder_companion.models import Alert, SymptomLog
+from elder_companion.models import DEFAULT_ELDER_ID, Alert, SymptomLog
+from elder_companion.privacy import visible_alerts
 from elder_companion.symptoms.schema import get_catalog
 from elder_companion.web.deps import AlertBusDep, SessionDep
 
@@ -96,12 +97,19 @@ def post_alert(body: AlertIn, session: SessionDep, bus: AlertBusDep) -> AlertOut
 def get_alerts(
     request: Request, session: SessionDep, limit: int = Query(50, ge=1, le=200)
 ) -> list[AlertOut]:
+    """Newest first. Non-urgent symptom alerts from a private segment are left out.
+
+    Privacy first, language second: what she asked to keep private must not reach the page
+    in any language, so the filter runs before anything is translated for display.
+    """
+    bypass = request.app.state.settings.privacy.bypass_levels
+    alerts = visible_alerts(session, DEFAULT_ELDER_ID, limit=limit, bypass_levels=bypass)
     lang = resolve(
         request.query_params.get("lang"),
         request.cookies.get(LANG_COOKIE),
         request.headers.get("accept-language"),
     )
-    return _localized(session, list_alerts(session, limit=limit), lang)
+    return _localized(session, list(alerts), lang)
 
 
 @router.post("/{alert_id}/read", response_model=AlertOut)

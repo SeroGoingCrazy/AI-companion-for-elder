@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from elder_companion.alerts.bus import AlertBus
 from elder_companion.chat.service import ChatService
-from elder_companion.symptoms.service import process_message_symptoms
+from elder_companion.pipeline import process_elder_message
 
 
 def get_session(request: Request) -> Iterator[Session]:
@@ -23,7 +23,12 @@ SessionDep = Annotated[Session, Depends(get_session)]
 def get_chat_service(request: Request, session: SessionDep) -> ChatService:
     settings = request.app.state.settings
     return ChatService(
-        session, request.app.state.llm, settings.chat, audio_dir=settings.paths.audio_dir
+        session,
+        request.app.state.llm,
+        settings.chat,
+        audio_dir=settings.paths.audio_dir,
+        agenda=settings.agenda,
+        memory=settings.memory,
     )
 
 
@@ -37,16 +42,20 @@ def get_alert_bus(request: Request) -> AlertBus:
 AlertBusDep = Annotated[AlertBus, Depends(get_alert_bus)]
 
 
-def get_symptom_pipeline(request: Request) -> Callable[[int], object]:
-    """`pipeline(user_message_id)`: run as a BackgroundTask after a chat turn."""
+def get_symptom_pipeline(request: Request) -> Callable[..., object]:
+    """`pipeline(user_message_id, reply_id)`: run as a BackgroundTask after a chat turn
+    (symptoms, ask-before-sharing consent, companion memory, then family redaction)."""
     state = request.app.state
     return partial(
-        process_message_symptoms,
+        process_elder_message,
         state.sessionmaker,
         state.symptom_extractor,
-        state.settings.symptoms,
+        state.memory_extractor,
+        state.settings,
         state.alert_bus,
+        state.redactor,
+        state.consent_extractor,
     )
 
 
-SymptomPipelineDep = Annotated[Callable[[int], object], Depends(get_symptom_pipeline)]
+SymptomPipelineDep = Annotated[Callable[..., object], Depends(get_symptom_pipeline)]

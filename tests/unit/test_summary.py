@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from elder_companion.db import init_db, make_engine, make_sessionmaker
@@ -29,10 +30,10 @@ class Clock:
 class FlakyLLM(MockLLMClient):
     fail = True
 
-    def chat(self, messages, *, max_tokens=None):  # noqa: ANN001
+    def extract_json(self, messages, *, schema, name):  # noqa: ANN001
         if self.fail:
             raise LLMError("down")
-        return super().chat(messages, max_tokens=max_tokens)
+        return super().extract_json(messages, schema=schema, name=name)
 
 
 @pytest.fixture
@@ -51,7 +52,8 @@ def _say(s: Session, text: str, at: datetime = NOW_UTC - timedelta(hours=1)) -> 
 
 
 def _summary_calls(llm: MockLLMClient) -> list:
-    return [m for name, m in llm.calls if name == "chat"]
+    """Since H7 the summary is a structured `daily_digest` call, not a plain chat."""
+    return [c["messages"] for name, c in llm.calls if name == "extract_json"]
 
 
 def test_no_chat_today_is_empty_and_free(session: Session) -> None:
@@ -84,10 +86,12 @@ def test_prompt_has_today_only_with_local_times(session: Session) -> None:
     session.commit()
     llm = MockLLMClient.from_config()
     r = DailySummary(llm, companion_name="Sunny", clock=Clock()).get(session, 1, NOW_LOCAL)
-    assert r.summary.startswith("Maggie") and not r.fallback
+    # An emergency alert leads the summary (daily_summary.txt), so the fall comes first.
+    assert r.summary.startswith("A fall was detected") and not r.fallback
 
     system, user = _summary_calls(llm)[0]
     assert "Maggie" in system["content"] and "never mention medicines" in system["content"]
+    assert "mood_score" in system["content"]
     notes = user["content"]
     assert "[9:05 AM] Elder: I watered the roses" in notes
     assert "Sunny: I see." in notes
@@ -99,30 +103,40 @@ def test_prompt_has_today_only_with_local_times(session: Session) -> None:
     assert "high: Fall detected" in notes
 
 
-def test_cache_reused_until_data_changes(session: Session) -> None:
+def test_stored_digest_is_reused_until_the_day_changes(session: Session) -> None:
     _say(session, "hello")
     llm, clock = MockLLMClient.from_config(), Clock()
     summary = DailySummary(llm, companion_name="Sunny", clock=clock)
     first = summary.get(session, 1, NOW_LOCAL)
-    clock.now += timedelta(minutes=5)
-    assert summary.get(session, 1, NOW_LOCAL) is first
+    clock.now += timedelta(hours=3)  # time alone never invalidates it
+    assert summary.get(session, 1, NOW_LOCAL) == first
     assert len(_summary_calls(llm)) == 1
 
-    _say(session, "my knee hurts")  # new message -> regenerate right away
-    second = summary.get(session, 1, NOW_LOCAL)
-    assert second is not first and len(_summary_calls(llm)) == 2
+    _say(session, "my knee hurts")  # new message -> regenerate right away, no TTL to wait out
+    assert summary.get(session, 1, NOW_LOCAL) != first
+    assert len(_summary_calls(llm)) == 2
 
 
-def test_cache_expires_after_ttl_and_on_refresh(session: Session) -> None:
+def test_refresh_regenerates(session: Session) -> None:
     _say(session, "hello")
-    llm, clock = MockLLMClient.from_config(), Clock()
-    summary = DailySummary(llm, companion_name="Sunny", clock=clock, ttl=timedelta(minutes=10))
+    llm = MockLLMClient.from_config()
+    summary = DailySummary(llm, companion_name="Sunny", clock=Clock())
     summary.get(session, 1, NOW_LOCAL)
     summary.get(session, 1, NOW_LOCAL, refresh=True)
     assert len(_summary_calls(llm)) == 2
-    clock.now += timedelta(minutes=11)
+
+
+def test_a_new_privacy_mark_regenerates_the_day(session: Session) -> None:
+    """The request usually arrives after the content it covers, so the digest must move."""
+    _say(session, "My friend Linda got bad news")
+    llm = MockLLMClient.from_config()
+    summary = DailySummary(llm, companion_name="Sunny", clock=Clock())
     summary.get(session, 1, NOW_LOCAL)
-    assert len(_summary_calls(llm)) == 3
+    for m in session.scalars(select(Message)):
+        m.private = True
+    session.commit()
+    r = summary.get(session, 1, NOW_LOCAL)
+    assert r.has_private and "Linda" not in r.summary
 
 
 def test_llm_failure_gives_plain_summary_and_is_not_cached(session: Session) -> None:
@@ -135,6 +149,6 @@ def test_llm_failure_gives_plain_summary_and_is_not_cached(session: Session) -> 
     summary = DailySummary(llm, companion_name="Sunny", clock=Clock())
     r = summary.get(session, 1, NOW_LOCAL)
     assert r.fallback
-    assert r.summary == "Maggie chatted 1 time today. Alerts: Chest pain (high)."
+    assert r.summary == "Maggie chatted 1 time that day."
     llm.fail = False
     assert not summary.get(session, 1, NOW_LOCAL).fallback

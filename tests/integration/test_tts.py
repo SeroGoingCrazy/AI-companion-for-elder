@@ -78,3 +78,25 @@ def test_tts_response_revalidates_instead_of_caching(client: TestClient) -> None
     assert r.headers.get("etag")
     again = client.get(f"/api/tts/{mid}", headers={"if-none-match": r.headers["etag"]})
     assert again.status_code == 304
+
+
+def test_tts_voice_switch_caches_per_voice(client, mock_llm, settings: Settings) -> None:
+    mid = _assistant_id(client)
+    assert client.get(f"/api/tts/{mid}?voice=male").status_code == 200
+    assert client.get(f"/api/tts/{mid}?voice=female").status_code == 200
+    assert client.get(f"/api/tts/{mid}?voice=male").status_code == 200  # cached
+    assert _tts_calls(mock_llm) == 2
+    male, female = settings.llm.tts_voices["male"], settings.llm.tts_voices["female"]
+    assert (settings.paths.audio_dir / f"{mid}.{male}.mp3").exists()
+    assert (settings.paths.audio_dir / f"{mid}.{female}.mp3").exists()
+
+
+def test_tts_rejects_unknown_voice(client: TestClient) -> None:
+    mid = _assistant_id(client)
+    assert client.get(f"/api/tts/{mid}?voice=robot").status_code == 422
+
+
+def test_elder_page_offers_the_voice_switch(client: TestClient) -> None:
+    html = client.get("/elder").text
+    assert 'id="voice-switch"' in html
+    assert '"voices": ["female", "male"]' in html

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Annotated
 
 from pydantic import AfterValidator
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import Engine, create_engine, event, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from elder_companion.settings import PROJECT_ROOT
@@ -64,6 +64,27 @@ def init_db(engine: Engine) -> None:
     from elder_companion import models  # noqa: F401  (register tables)
 
     Base.metadata.create_all(engine)
+    add_missing_columns(engine)
+
+
+def add_missing_columns(engine: Engine) -> None:
+    """Tiny forward-only migration: ALTER TABLE ADD COLUMN for columns that a newer model has
+    but an existing database lacks (e.g. Stage H's message.private). New columns must be
+    nullable or have a server default."""
+    insp = inspect(engine)
+    with engine.begin() as conn:
+        for table in Base.metadata.sorted_tables:
+            if not insp.has_table(table.name):
+                continue
+            existing = {c["name"] for c in insp.get_columns(table.name)}
+            for col in table.columns:
+                if col.name in existing:
+                    continue
+                col_type = col.type.compile(engine.dialect)
+                ddl = f"ALTER TABLE {table.name} ADD COLUMN {col.name} {col_type}"
+                if col.server_default is not None:
+                    ddl += f" DEFAULT {col.server_default.arg.compile(dialect=engine.dialect)}"
+                conn.execute(text(ddl))
 
 
 def reset_db(engine: Engine) -> None:

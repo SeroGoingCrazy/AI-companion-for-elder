@@ -12,13 +12,17 @@ from fastapi.staticfiles import StaticFiles
 
 from elder_companion import __version__
 from elder_companion.alerts.bus import AlertBus
+from elder_companion.consent import ConsentExtractor
 from elder_companion.db import init_db, make_engine, make_sessionmaker
 from elder_companion.llm import BaseLLMClient, get_llm
+from elder_companion.memory.extractor import MemoryExtractor
+from elder_companion.redaction import Redactor
+from elder_companion.reports.weekly import WeeklyReport
 from elder_companion.seed import seed_demo
 from elder_companion.settings import Settings, get_settings
 from elder_companion.summary import DailySummary
 from elder_companion.symptoms.extractor import SymptomExtractor
-from elder_companion.web.routes import alerts, chat, fall_proxy, family, pages, pwa
+from elder_companion.web.routes import alerts, chat, fall_proxy, family, pages, pwa, reports
 
 
 def create_app(settings: Settings | None = None, llm: BaseLLMClient | None = None) -> FastAPI:
@@ -36,9 +40,19 @@ def create_app(settings: Settings | None = None, llm: BaseLLMClient | None = Non
     app.state.sessionmaker = session_factory
     app.state.llm = llm or get_llm(settings.llm)
     app.state.symptom_extractor = SymptomExtractor(app.state.llm)
+    app.state.memory_extractor = MemoryExtractor(app.state.llm)
+    app.state.redactor = Redactor(app.state.llm)
+    app.state.consent_extractor = ConsentExtractor(app.state.llm)
     app.state.alert_bus = AlertBus()
+    app.state.weekly_report = WeeklyReport(
+        app.state.llm,
+        companion_name=settings.chat.companion_name,
+        bypass_levels=settings.privacy.bypass_levels,
+    )
     app.state.daily_summary = DailySummary(
-        app.state.llm, companion_name=settings.chat.companion_name
+        app.state.llm,
+        companion_name=settings.chat.companion_name,
+        bypass_levels=settings.privacy.bypass_levels,
     )
 
     app.include_router(alerts.router)
@@ -46,6 +60,7 @@ def create_app(settings: Settings | None = None, llm: BaseLLMClient | None = Non
     app.include_router(chat.tts_router)
     app.include_router(family.router)
     app.include_router(pages.router)
+    app.include_router(reports.router)
     app.include_router(pwa.router)
     app.include_router(fall_proxy.router)
     app.mount("/static", StaticFiles(directory=pages.WEB_DIR / "static"), name="static")

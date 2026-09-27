@@ -8,6 +8,7 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Query,
     Request,
     Response,
     UploadFile,
@@ -17,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from elder_companion.chat.service import ChatResult, MessageNotFound
 from elder_companion.elders import ElderNotFound
+from elder_companion.redaction import redact_messages
 from elder_companion.web.deps import ChatServiceDep, SymptomPipelineDep
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -88,9 +90,10 @@ class ChatOut(BaseModel):
 def schedule_symptoms(
     result: ChatResult, tasks: BackgroundTasks, pipeline: SymptomPipelineDep
 ) -> None:
-    """Extract symptoms after the response is sent, so chat latency is unaffected."""
+    """Extract symptoms (and redact the turn for the family) after the response is sent, so
+    chat latency is unaffected."""
     if result.user_message_id is not None:
-        tasks.add_task(pipeline, result.user_message_id)
+        tasks.add_task(pipeline, result.user_message_id, result.message_id)
 
 
 @router.post("", response_model=ChatOut)
@@ -129,12 +132,17 @@ def chat_audio(
 
 
 @router.post("/greet", response_model=ChatOut)
-def greet(service: ChatServiceDep, body: GreetIn | None = None) -> ChatOut:
+def greet(
+    request: Request, service: ChatServiceDep, tasks: BackgroundTasks, body: GreetIn | None = None
+) -> ChatOut:
     """Opening line when the elder app starts; body is optional."""
     try:
-        return ChatOut.of(service.greet(body.elder_id if body else None))
+        result = service.greet(body.elder_id if body else None)
     except ElderNotFound as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
+    state = request.app.state
+    tasks.add_task(redact_messages, state.sessionmaker, state.redactor, [result.message_id])
+    return ChatOut.of(result)
 
 
 @tts_router.get(
@@ -142,10 +150,19 @@ def greet(service: ChatServiceDep, body: GreetIn | None = None) -> ChatOut:
     response_class=FileResponse,
     responses={200: {"content": {"audio/mpeg": {}}}, 204: {"description": "TTS unavailable"}},
 )
-def tts(message_id: int, request: Request, service: ChatServiceDep) -> Response:
-    """mp3 of an assistant reply (generated once, then cached). 204 = speak/show text instead."""
+def tts(
+    message_id: int,
+    request: Request,
+    service: ChatServiceDep,
+    voice: str | None = Query(None, description="a key of llm.tts_voices, e.g. female / male"),
+) -> Response:
+    """mp3 of an assistant reply (generated once per voice, then cached). 204 = speak/show text
+    instead."""
+    voices = request.app.state.settings.llm.tts_voices
+    if voice is not None and voice not in voices:
+        raise HTTPException(status_code=422, detail=f"voice must be one of {sorted(voices)}")
     try:
-        path = service.synthesize(message_id)
+        path = service.synthesize(message_id, voices[voice] if voice else None)
     except MessageNotFound as e:
         raise HTTPException(
             status_code=404, detail=f"assistant message {message_id} not found"
@@ -155,7 +172,7 @@ def tts(message_id: int, request: Request, service: ChatServiceDep) -> Response:
     # no-cache = revalidate with the ETag every time. Message ids restart after a DB reset,
     # so a long max-age would make the browser replay stale audio for a new message.
     stat = path.stat()
-    etag = f'"{message_id}-{stat.st_mtime_ns}-{stat.st_size}"'
+    etag = f'"{path.stem}-{stat.st_mtime_ns}-{stat.st_size}"'
     headers = {"Cache-Control": "no-cache", "ETag": etag}
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers=headers)

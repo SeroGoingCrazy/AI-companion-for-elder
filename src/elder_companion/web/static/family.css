@@ -226,8 +226,8 @@ body {
  * fixed set of destinations at the bottom, within thumb reach, and that bar is the single
  * strongest signal that a page is an app rather than a document.
  *
- * Four destinations, mapped onto what the family actually comes for: how is she, what
- * happened, let me look, what did she say.
+ * Five destinations, mapped onto what the family actually comes for: how is she, what
+ * happened, what she is carrying and what to bring up, let me look, what did she say.
  */
 
 .dash { padding-bottom: calc(var(--tabbar-h) + 26px); }
@@ -236,7 +236,7 @@ body {
 
 .tabbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
-  display: grid; grid-template-columns: repeat(4, 1fr);
+  display: grid; grid-template-columns: repeat(5, 1fr);
   background: color-mix(in srgb, var(--paper-lift) 92%, transparent);
   -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
   border-top: 1px solid var(--rule);
@@ -294,3 +294,99 @@ body {
    bar out from under the thumb, and on a phone that reads as "the app is broken". */
 .dash, .card, .alert-item { max-width: 100%; min-width: 0; }
 .card img, .card video { max-width: 100%; }
+
+/* ---------- reminders, care list, member picker ----------
+ *
+ * These components arrived on dev while this branch was redesigning the surface. Their
+ * structure and semantics are kept exactly as written; only the colours, radii and
+ * shadows are restated in this file's tokens, so they sit on the warm palette instead of
+ * the blue-grey one they were drawn against. style.css still exists and still styles the
+ * printable pages (weekly report, doctor one-pager, memoir), which are a separate surface.
+ */
+
+.member-picker { display: inline-flex; align-items: center; gap: 7px; font-size: var(--t-meta); color: var(--ink-2); }
+.member-picker select {
+  min-height: 40px; padding: 0 10px; border-radius: var(--r-control);
+  border: 1px solid var(--rule); background: var(--paper-lift); color: var(--ink);
+  font-family: var(--face-ui); font-size: var(--t-meta);
+}
+.member-picker select:focus-visible { outline: 3px solid var(--ink); outline-offset: 1px; }
+
+.report-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 15px 0 0; }
+
+.care-intro, .reminders-intro { margin: -3px 0 12px; color: var(--ink-2); font-size: var(--t-meta); }
+.reminders-note { margin: 10px 0 0; font-size: 13px; color: var(--ink-3); }
+
+.care-list, .reminder-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.care-item, .reminder-item {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: start;
+  padding: 12px 14px; border: 1px solid var(--rule); border-radius: var(--r-card);
+}
+.care-item:last-child { margin-bottom: 0; }
+.care-title, .reminder-text { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
+.care-kind, .reminder-when-label { margin: 0; font-size: 13px; color: var(--ink-3); }
+.care-item .quote { margin: 4px 0 0; color: var(--ink-2); font-style: italic; overflow-wrap: anywhere; }
+.care-item .meta, .reminder-item .meta { grid-column: 1 / -1; }
+.reminder-item.is-off { opacity: .62; }
+
+/* Adherence: one dot per day, oldest left. Shape as well as colour, so the row still
+   reads for a colour-blind child and on a printed page. */
+.adherence { display: flex; gap: 5px; margin: 6px 0 0; padding: 0; list-style: none; grid-column: 1 / -1; }
+.dose {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 1px solid var(--rule); background: var(--paper-lift);
+  display: grid; place-items: center; font-size: 11px; font-weight: 700; line-height: 1;
+}
+.dose-confirmed { background: var(--calm-wash); border-color: #9BC2A8; color: var(--calm); }
+.dose-declined { background: var(--watch-wash); border-color: #DFBE86; color: var(--watch); }
+.dose-no_response { background: var(--alarm-wash); border-color: #E3AFA4; color: var(--alarm); }
+.dose-none { color: var(--ink-3); }
+.adherence-summary { font-size: 13px; color: var(--ink-3); white-space: nowrap; }
+
+.reminder-form {
+  margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--rule);
+  display: grid; gap: 10px;
+}
+.reminder-form input[type="text"] {
+  min-height: var(--tap); padding: 0 13px; width: 100%;
+  border: 1px solid var(--rule); border-radius: var(--r-control);
+  background: var(--paper-lift); color: var(--ink); font-family: var(--face-ui);
+}
+.reminder-form input:focus-visible,
+.reminder-radio input:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+.reminder-when { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.reminder-radio { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--ink-2); }
+.reminder-radio input[type="time"], .reminder-radio input[type="date"] {
+  min-height: 38px; padding: 0 8px; border: 1px solid var(--rule); border-radius: var(--r-control);
+  background: var(--paper-lift); color: var(--ink); font-family: var(--face-ui); font-size: 14px;
+}
+.reminder-radio input:disabled { opacity: .5; }
+.btn-attention { background: var(--amber); border-color: var(--amber); color: var(--ink); }
+.reminder-form .btn-attention { justify-self: start; }
+.reminder-error { margin: 0; color: var(--alarm); font-size: 13px; font-weight: 700; }
+
+.claim { margin: 4px 0 0; font-size: var(--t-meta); color: var(--ink-2); }
+.claim-badge {
+  display: inline-block; padding: 1px 9px; border-radius: var(--r-chip);
+  background: var(--watch-wash); color: var(--watch); font-size: 13px; font-weight: 700;
+}
+.claim-badge.is-done { background: var(--calm-wash); color: var(--calm); }
+.claim-form { display: flex; gap: 8px; margin: 8px 0 0; grid-column: 1 / -1; }
+.claim-input {
+  flex: 1; min-height: 40px; padding: 0 12px;
+  border: 1px solid var(--rule); border-radius: var(--r-control);
+  background: var(--paper-lift); color: var(--ink); font-family: var(--face-ui);
+}
+.claim-input:focus-visible { outline: 3px solid var(--ink); outline-offset: 1px; }
+
+/* Redacted turns still appear, marked, so the family can see that something was held
+   back rather than silently missing from the transcript. */
+.history-msg.is-private { border-style: dashed; opacity: .78; }
+.private-note { margin: 18px 0 0; padding-top: 12px; border-top: 1px solid var(--rule); color: var(--ink-3); }
+
+/* the dashboard header on dev used its own names for these two */
+.dash-header-tools { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dash-brand { display: flex; align-items: center; gap: 13px; }
+.dash-sub { margin: 1px 0 0; color: var(--ink-2); font-size: var(--t-meta); }
+.chip { display: inline-block; padding: 3px 11px; border-radius: var(--r-chip); font-size: 13px; font-weight: 700; }
+.sev-red { background: var(--alarm); color: #fff; }

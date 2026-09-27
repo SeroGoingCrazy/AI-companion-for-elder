@@ -26,7 +26,7 @@
       <p id="banner-content" class="alert-banner-content"></p>
       <p id="banner-time" class="alert-banner-time"></p>
     </div>
-    <div class="actions">
+    <div class="actions alert-banner-actions">
       <button id="banner-read" type="button" class="btn btn-light">{{ t.family.mark_as_read }}</button>
       <button id="banner-close" type="button" class="btn btn-ghost-light" aria-label="{{ t.family.mark_as_read }}">✕</button>
     </div>
@@ -34,20 +34,25 @@
 
   <main class="dash">
     <header class="dash-header">
-      <svg class="avatar" viewBox="0 0 48 48" aria-hidden="true">
-        <circle class="disc" cx="24" cy="24" r="10.5" />
-        <g class="ray" stroke-width="3.5" stroke-linecap="round">
-          <line x1="24" y1="4" x2="24" y2="9" /><line x1="24" y1="39" x2="24" y2="44" />
-          <line x1="4" y1="24" x2="9" y2="24" /><line x1="39" y1="24" x2="44" y2="24" />
-          <line x1="9.9" y1="9.9" x2="13.4" y2="13.4" /><line x1="34.6" y1="34.6" x2="38.1" y2="38.1" />
-          <line x1="9.9" y1="38.1" x2="13.4" y2="34.6" /><line x1="34.6" y1="13.4" x2="38.1" y2="9.9" />
-        </g>
-      </svg>
-      <div>
-        <h1>{{ t.family.title.format(nickname=elder.nickname) }}</h1>
-        <p class="meta">{{ t.family.subtitle.format(name=elder.name, companion=companion_name) }}</p>
+      <div class="dash-brand">
+        <svg class="avatar" viewBox="0 0 48 48" aria-hidden="true">
+          <circle class="disc" cx="24" cy="24" r="10.5" />
+          <g class="ray" stroke-width="3.5" stroke-linecap="round">
+            <line x1="24" y1="4" x2="24" y2="9" /><line x1="24" y1="39" x2="24" y2="44" />
+            <line x1="4" y1="24" x2="9" y2="24" /><line x1="39" y1="24" x2="44" y2="24" />
+            <line x1="9.9" y1="9.9" x2="13.4" y2="13.4" /><line x1="34.6" y1="34.6" x2="38.1" y2="38.1" />
+            <line x1="9.9" y1="38.1" x2="13.4" y2="34.6" /><line x1="34.6" y1="13.4" x2="38.1" y2="9.9" />
+          </g>
+        </svg>
+        <div>
+          <h1>{{ t.family.title.format(nickname=elder.nickname) }}</h1>
+          <p class="dash-sub">{{ t.family.subtitle.format(name=elder.name, companion=companion_name) }}</p>
+        </div>
       </div>
-      <div class="header-tools">
+      <div class="dash-header-tools">
+        <label class="member-picker">{{ t.family.viewing_as }}
+          <select id="member-select" aria-label="Family member"></select>
+        </label>
         <button id="sound-btn" type="button" class="btn btn-quiet" aria-pressed="false">🔕 {{ t.family.sound_off }}</button>
         <span id="live" class="live" data-state="connecting"><span class="dot" aria-hidden="true"></span><span id="live-text">{{ t.family.connecting }}</span></span>
         <button id="lang-btn" class="btn lang-switch" type="button" data-next="{{ other_lang }}">{{ t.switch_to }}</button>
@@ -63,6 +68,11 @@
         </div>
         <p id="summary-text" class="summary-text">{{ t.family.loading }}</p>
         <p id="summary-meta" class="meta"></p>
+        <nav class="report-links" aria-label="Reports">
+          <a class="btn btn-quiet" href="/family/report/weekly">{{ t.family.report_weekly }}</a>
+          <a class="btn btn-quiet" href="/family/doctor">{{ t.family.report_doctor }}</a>
+          <a class="btn btn-quiet" href="/family/memoir">{{ t.family.report_memoir.format(nickname=elder.nickname) }}</a>
+        </nav>
       </section>
 
       <section class="card symptoms-card" aria-labelledby="symptoms-h">
@@ -84,6 +94,47 @@
         <h2 id="alerts-h">{{ t.family.alerts }} <span id="unread-count" class="count-badge" hidden></span></h2>
         <ul id="alert-list" class="alert-list"></ul>
         <p id="alerts-empty" class="empty" hidden>{{ t.family.no_alerts }}</p>
+      </section>
+    </div>
+
+    <!-- What she is carrying, and what the family wants brought up next time. -->
+    <div id="panel-care" class="panel" role="tabpanel" aria-labelledby="tab-care" hidden>
+      <section class="card care-card" aria-labelledby="care-h">
+        <div class="card-head">
+          <h2 id="care-h">{{ t.family.care_title.format(nickname=elder.nickname) }}</h2>
+        </div>
+        <p class="meta care-intro">{{ t.family.care_intro }}</p>
+        <ul id="care-list" class="care-list"></ul>
+        <p id="care-empty" class="empty" hidden>{{ t.family.care_empty }}</p>
+      </section>
+
+      <section class="card reminders-card" aria-labelledby="reminders-h">
+        <div class="card-head">
+          <h2 id="reminders-h">{{ t.family.reminders }}</h2>
+          <span class="meta">{{ t.family.reminders_window }}</span>
+        </div>
+        <p class="meta reminders-intro">{{ t.family.reminders_intro.format(companion=companion_name, nickname=elder.nickname) }}</p>
+        <ul id="reminder-list" class="reminder-list"></ul>
+        <p id="reminders-empty" class="empty" hidden>{{ t.family.reminders_empty }}</p>
+
+        <form id="reminder-form" class="reminder-form" autocomplete="off">
+          <label class="visually-hidden" for="reminder-text">{{ t.family.reminder_label.format(companion=companion_name) }}</label>
+          <input id="reminder-text" type="text" maxlength="200" required
+                 placeholder="{{ t.family.reminder_placeholder }}">
+          <div class="reminder-when">
+            <label class="reminder-radio">
+              <input type="radio" name="reminder-kind" value="daily" checked> {{ t.family.reminder_daily }}
+              <input id="reminder-time" type="time" value="08:00" aria-label="Time of day">
+            </label>
+            <label class="reminder-radio">
+              <input type="radio" name="reminder-kind" value="once"> {{ t.family.reminder_once }}
+              <input id="reminder-date" type="date" aria-label="Date" disabled>
+            </label>
+          </div>
+          <p id="reminder-error" class="reminder-error" role="alert" hidden></p>
+          <button type="submit" class="btn btn-attention">{{ t.family.reminder_add }}</button>
+        </form>
+        <p class="meta reminders-note">{{ t.family.reminders_note.format(companion=companion_name) }}</p>
       </section>
     </div>
 
@@ -112,7 +163,10 @@
       </section>
     </div>
 
-    <footer class="dash-footer">{{ t.family.ai_note.format(nickname=elder.nickname) }}</footer>
+    <footer class="dash-footer">
+      {{ t.family.ai_note.format(nickname=elder.nickname) }}
+      {{ t.family.privacy_note.format(nickname=elder.nickname) }}
+    </footer>
   </main>
 
   <nav class="tabbar" role="tablist" aria-label="{{ t.family.title.format(nickname=elder.nickname) }}">
@@ -126,6 +180,10 @@
         <span id="tab-badge" class="tab-dot" hidden></span>
       </span>
       {{ t.family.tab_alerts }}
+    </button>
+    <button id="tab-care" type="button" role="tab" aria-selected="false" aria-controls="panel-care" data-panel="care">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.3A4 4 0 0 1 12 8a4 4 0 0 1 7 2.7C19 15.6 12 20 12 20Z"/></svg>
+      {{ t.family.tab_care }}
     </button>
     <button id="tab-monitor" type="button" role="tab" aria-selected="false" aria-controls="panel-monitor" data-panel="monitor">
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="m16 11 5-3v8l-5-3z"/></svg>

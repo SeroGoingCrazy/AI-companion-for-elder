@@ -36,6 +36,8 @@ class LLMSettings(_Model):
     asr_prompt: str = ""  # biases transcription style, e.g. Simplified Chinese
     tts_model: str
     tts_voice: str
+    # Voices the elder can pick in the app (key -> provider voice name).
+    tts_voices: dict[str, str] = {"female": "coral", "male": "ash"}
     tts_instructions: str
     vision_model: str
     timeout_s: float = 15
@@ -79,6 +81,23 @@ class ChatSettings(_Model):
 class SymptomSettings(_Model):
     merge_window_hours: float = 24
     alert_debounce_hours: float = 2
+
+
+class MemorySettings(_Model):
+    care_list_min_mentions: int = 2
+    follow_up_default_delay_days: int = 1
+    follow_up_expire_days: int = 7
+
+
+class AgendaSettings(_Model):
+    max_items_per_greet: int = 3
+
+
+class PrivacySettings(_Model):
+    max_span_user_messages: int = 3  # preceding user messages a privacy request can cover
+    bypass_levels: tuple[str, ...] = ("high",)  # alert levels that ignore privacy (ADR 19)
+    # Hold symptoms and personal matters back from the family until she agrees (ADR 23).
+    ask_before_sharing: bool = True
 
 
 class FallMCPSettings(_Model):
@@ -139,6 +158,9 @@ class Settings(_Model):
     llm: LLMSettings
     chat: ChatSettings
     symptoms: SymptomSettings
+    memory: MemorySettings = MemorySettings()
+    agenda: AgendaSettings = AgendaSettings()
+    privacy: PrivacySettings = PrivacySettings()
     fall: FallSettings
     database: DatabaseSettings
     server: ServerSettings

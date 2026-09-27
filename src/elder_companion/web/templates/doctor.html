@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Symptom notes: {{ r.elder.name }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;700;800&display=swap">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="family report">
+  <main class="report-page">
+    <nav class="report-nav no-print">
+      <a href="/family">← Back to the dashboard</a>
+      <button type="button" class="btn btn-attention" onclick="window.print()">Print / Save as PDF</button>
+    </nav>
+
+    <header class="report-head">
+      <h1>Symptom notes for the doctor</h1>
+      <p class="report-who"><strong>{{ r.elder.name }}</strong>
+        · {{ fmt_date(r.start) }} to {{ fmt_date(r.end) }} (last {{ r.days }} days)</p>
+      <p class="meta">{{ r.disclaimer }} Quotes are her exact words, with the time she said them.</p>
+    </header>
+
+    <section class="report-section" aria-labelledby="flags-h">
+      <h2 id="flags-h">Urgent alerts</h2>
+      {% if r.red_flags %}
+      <ul class="report-flags">
+        {% for a in r.red_flags %}
+        <li><span class="level-badge level-high">Urgent</span> {{ a.title }}
+          <span class="meta">{{ "fall detection" if a.type == "fall" else "from chat" }} · {{ fmt_when(a.at) }}</span></li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="empty">None in this period.</p>
+      {% endif %}
+    </section>
+
+    <section class="report-section" aria-labelledby="sym-h">
+      <h2 id="sym-h">Symptoms she mentioned</h2>
+      {% if r.symptoms %}
+      <table class="report-table">
+        <thead>
+          <tr><th scope="col">Symptom</th><th scope="col">First / last mentioned</th><th scope="col">Times</th><th scope="col">Worst severity</th><th scope="col">Latest status</th></tr>
+        </thead>
+        {% for s in r.symptoms %}
+        <tbody class="report-symptom">
+          <tr>
+            <th scope="row">{% if s.red_flag %}<span class="level-badge level-high">Emergency sign</span> {% endif %}{{ s.name }}{% if s.name_zh %} <span class="meta">{{ s.name_zh }}</span>{% endif %}</th>
+            <td data-label="Mentioned">{{ fmt_date(s.first_seen) }}{% if fmt_date(s.last_seen) != fmt_date(s.first_seen) %} – {{ fmt_date(s.last_seen) }}{% endif %}</td>
+            <td data-label="Times">{{ s.count }}</td>
+            <td data-label="Worst">{{ "not stated" if s.max_severity == "unknown" else s.max_severity }}</td>
+            <td data-label="Status">{{ "improving" if s.status == "improved" else s.status }}</td>
+          </tr>
+          <tr class="report-quotes">
+            <td colspan="5">
+              <ul>
+                {% for q in s.quotes %}
+                <li><span class="meta">{{ fmt_when(q.at) }}</span> <q>{{ q.text }}</q></li>
+                {% endfor %}
+                {% if s.total_quotes > s.quotes|length %}<li class="meta">and {{ s.total_quotes - s.quotes|length }} earlier mention{{ "s" if s.total_quotes - s.quotes|length > 1 }}</li>{% endif %}
+              </ul>
+            </td>
+          </tr>
+        </tbody>
+        {% endfor %}
+      </table>
+      {% else %}
+      <p class="empty">No symptoms mentioned in this period.</p>
+      {% endif %}
+    </section>
+
+    <footer class="report-foot meta">Generated {{ fmt_when(r.end) }}. {{ r.disclaimer }} This product does not provide medical diagnosis.</footer>
+  </main>
+</body>
+</html>

@@ -47,8 +47,8 @@ class BaseLLMClient(ABC):
         """Return the transcript of an audio clip."""
 
     @abstractmethod
-    def tts(self, text: str) -> bytes:
-        """Return mp3 audio for `text`."""
+    def tts(self, text: str, *, voice: str | None = None) -> bytes:
+        """Return mp3 audio for `text` (voice: a provider voice name; None = the default)."""
 
 
 class OpenAIClient(BaseLLMClient):
@@ -111,11 +111,11 @@ class OpenAIClient(BaseLLMClient):
             return ""
         return text
 
-    def tts(self, text: str) -> bytes:
+    def tts(self, text: str, *, voice: str | None = None) -> bytes:
         try:
             resp = self._client.audio.speech.create(
                 model=self._s.tts_model,
-                voice=self._s.tts_voice,
+                voice=voice or self._s.tts_voice,
                 input=text,
                 instructions=self._s.tts_instructions,
                 response_format="mp3",

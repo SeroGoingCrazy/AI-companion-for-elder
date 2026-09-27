@@ -35,6 +35,10 @@
         <h1>{{ companion_name }}</h1>
         <p class="subtitle">{{ t.elder.subtitle.format(nickname=nickname) }}</p>
       </div>
+      <div id="voice-switch" class="voice-switch" role="group" aria-label="{{ t.elder.voice_group.format(companion=companion_name) }}">
+        <button type="button" data-voice="female" aria-pressed="true">{{ t.elder.voice_female }}</button>
+        <button type="button" data-voice="male" aria-pressed="false">{{ t.elder.voice_male }}</button>
+      </div>
       <button id="lang-btn" class="lang-switch" type="button" data-next="{{ other_lang }}">{{ t.switch_to }}</button>
     </header>
 

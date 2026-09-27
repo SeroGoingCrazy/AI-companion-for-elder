@@ -13,6 +13,9 @@ llm:
   asr_prompt: "以下是一段简体中文或英文的日常聊天录音转写。Transcript of a casual chat in English or Simplified Chinese."
   tts_model: ${TTS_MODEL:-gpt-4o-mini-tts}
   tts_voice: ${TTS_VOICE:-coral}
+  tts_voices:                                # the elder app's voice switch
+    female: ${TTS_VOICE_FEMALE:-coral}
+    male: ${TTS_VOICE_MALE:-ash}
   tts_instructions: "Speak slowly, warmly and clearly, like a caring family member."
   vision_model: ${VISION_MODEL:-gpt-4.1-mini}
   timeout_s: 15
@@ -27,6 +30,19 @@ chat:
 symptoms:
   merge_window_hours: 24
   alert_debounce_hours: 2
+
+memory:
+  care_list_min_mentions: 2          # people/topics mentioned this often appear on the care list
+  follow_up_default_delay_days: 1    # "I'll repot the orchid" with no date -> ask tomorrow
+  follow_up_expire_days: 7           # follow-ups never asked this long after they were due are dropped
+
+agenda:
+  max_items_per_greet: 3             # follow-ups carried by one greeting; the rest wait
+
+privacy:
+  max_span_user_messages: 3          # preceding user messages a privacy request can cover
+  bypass_levels: [high]              # alert levels that ignore privacy marks — do not change without an ADR
+  ask_before_sharing: ${ASK_BEFORE_SHARING:-true}   # symptoms / personal matters wait for her OK (red flags never wait)
 
 fall:
   model: ${FALL_MODEL:-models/yolo11n-pose.pt}   # fetched by scripts/fetch_demo_media.py

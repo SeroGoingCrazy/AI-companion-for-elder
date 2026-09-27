@@ -24,6 +24,9 @@ elder:
   not_caught: Sorry, I didn't quite catch that. Could you say it again?
   failed: Sorry, something went wrong. Please try again.
   type_instead: Type instead
+  voice_group: "{companion}'s voice"
+  voice_female: Woman's voice
+  voice_male: Man's voice
   your_message: Your message
   placeholder: Type a message…
   send: Send
@@ -42,6 +45,25 @@ family:
   tab_alerts: Alerts
   tab_monitor: Camera
   tab_chat: Chat
+  viewing_as: Viewing as
+  report_weekly: Weekly report
+  report_doctor: Doctor one-pager
+  report_memoir: "{nickname}'s stories"
+  care_title: "On {nickname}'s mind"
+  care_intro: People and things she keeps bringing up.
+  care_empty: Nothing yet. People and topics she mentions more than once show up here.
+  reminders: Reminders
+  reminders_window: Last 7 days
+  reminders_intro: "{companion} brings these up in {nickname}'s next chat, in your words."
+  reminders_empty: No reminders yet. Add one below.
+  reminder_label: "What should {companion} check on?"
+  reminder_placeholder: "e.g. blood pressure pill with breakfast"
+  reminder_daily: Every day at
+  reminder_once: Once on
+  reminder_add: Add reminder
+  reminders_note: "{companion} repeats your wording and never adds a dose or medical advice."
+  privacy_note: "When {nickname} asks to keep something private, it is left out of this page, except urgent safety alerts."
+  tab_care: Care
   refresh: Refresh
   updating: Updating…
   updated: "Updated {time}"

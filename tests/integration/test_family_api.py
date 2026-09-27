@@ -79,7 +79,7 @@ def test_messages_oldest_first_with_paging(client: TestClient) -> None:
         s.commit()
     msgs = client.get("/api/messages?limit=3").json()
     assert [m["text"] for m in msgs] == ["m2", "m3", "m4"]
-    assert set(msgs[0]) == {"id", "role", "text", "created_at"}
+    assert set(msgs[0]) == {"id", "role", "text", "private", "awaiting_consent", "created_at"}
     older = client.get(f"/api/messages?limit=3&before_id={msgs[0]['id']}").json()
     assert [m["text"] for m in older] == ["m0", "m1"]
 
@@ -100,7 +100,7 @@ def test_today_summary(client: TestClient) -> None:
     assert empty["empty"] is True and empty["summary"] == "No conversations yet today."
     client.post("/api/chat", json={"text": "I watered the roses"})
     body = client.get("/api/summary/today").json()
-    assert set(body) == {"summary", "generated_at", "fallback", "empty"}
+    assert set(body) == {"summary", "generated_at", "fallback", "empty", "has_private"}
     assert body["empty"] is False and body["summary"].startswith("Maggie")
     again = client.get("/api/summary/today").json()
     assert again["generated_at"] == body["generated_at"]  # cached
