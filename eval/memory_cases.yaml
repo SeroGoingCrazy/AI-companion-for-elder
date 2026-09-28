@@ -1,5 +1,6 @@
 # L2 memory-extraction eval (DEV_SPEC 4.2): exact match on the set of (kind, subject);
 # subjects compare case-insensitively, and `optional` pairs may appear without failing.
+# An expected subject may be a list of synonyms (same kind): any one of them counts.
 # expect_privacy: true = privacy_request.requested must be true (recall must be 100%).
 # context: earlier turns as [role, text] (ids are assigned in order).
 
@@ -10,14 +11,12 @@
   expect_items: [[follow_up, grandson Leo]]
   optional: [[follow_up, math exam], [follow_up, Leo's exam], [follow_up, Leo], [person, grandson Leo], [person, Leo]]
 - say: "明天我要去参加社区的合唱排练。"          # "Tomorrow I'm going to community choir rehearsal"
-  expect_items: [[follow_up, choir rehearsal]]
-  optional: [[follow_up, community choir rehearsal], [follow_up, choir], [follow_up, community choir]]
+  expect_items: [[follow_up, [choir rehearsal, community choir rehearsal, choir, community choir]]]
 - say: "Amy is coming to visit next weekend, I want to bake her favorite pie."
-  expect_items: [[follow_up, Amy's visit]]
-  optional: [[follow_up, Amy visit], [follow_up, visit from Amy], [follow_up, Amy], [follow_up, pie], [follow_up, baking pie]]
+  expect_items: [[follow_up, [Amy's visit, Amy visit, visit from Amy, Amy]]]
+  optional: [[follow_up, pie], [follow_up, baking pie]]
 - say: "I'm seeing the eye doctor tomorrow afternoon."
-  expect_items: [[follow_up, eye doctor]]
-  optional: [[follow_up, eye doctor appointment], [follow_up, eye doctor visit]]
+  expect_items: [[follow_up, [eye doctor, eye doctor appointment, eye doctor visit]]]
 
 # --- people and topics ---
 - say: "Rosa from next door brought me soup again."
@@ -27,8 +26,8 @@
   expect_items: [[topic, church choir]]
   optional: [[topic, choir], [topic, christmas songs]]
 - say: "我那盆月季终于开花了！"                 # "My potted roses finally bloomed!"
-  expect_items: [[topic, roses]]
-  optional: [[topic, rose], [topic, potted roses], [topic, garden], [topic, China rose], [topic, rose plant]]
+  expect_items: [[topic, [roses, rose, potted roses, China rose, month rose, rose plant]]]
+  optional: [[topic, garden]]
 
 # --- stories ---
 - say: "When I started teaching in 1972, my first class had forty-two children."

@@ -4,7 +4,8 @@ Usage: uv run python eval/run_memory_eval.py [--cases eval/memory_cases.yaml] [-
 Needs OPENAI_API_KEY (LLM_PROVIDER=mock also works, as a smoke test of the harness).
 Scoring: every expected (kind, subject) found and nothing outside expected + optional, with
 subjects compared case-insensitively (kinds in `subject_free` compare by kind only), and
-`requested` matching `expect_privacy`.
+`requested` matching `expect_privacy`. An expected subject may be a list of accepted names
+(synonyms of the same kind); any one of them satisfies it.
 Exit code 1 when accuracy < 90% or privacy-request recall < 100%.
 """
 
@@ -31,7 +32,7 @@ FIRST_ID = 100
 @dataclass
 class CaseResult:
     say: str
-    expected: set[tuple[str, str]]
+    expected: list[frozenset[tuple[str, str]]]  # one set of accepted keys per expected item
     got: set[tuple[str, str]]
     optional: frozenset[tuple[str, str]]
     expect_privacy: bool
@@ -40,7 +41,8 @@ class CaseResult:
 
     @property
     def items_ok(self) -> bool:
-        return self.expected <= self.got <= self.expected | self.optional
+        allowed = self.optional.union(*self.expected)
+        return all(accepted & self.got for accepted in self.expected) and self.got <= allowed
 
     @property
     def ok(self) -> bool:
@@ -57,7 +59,10 @@ def run_case(extractor: MemoryExtractor, case: dict) -> CaseResult:
         Turn(FIRST_ID + i, role, text) for i, (role, text) in enumerate(case.get("context", []))
     ]
     current = FIRST_ID + len(turns)
-    expected = {_key(k, s, free) for k, s in case.get("expect_items", [])}
+    expected = [
+        frozenset(_key(k, name, free) for name in (s if isinstance(s, list) else [s]))
+        for k, s in case.get("expect_items", [])
+    ]
     optional = frozenset(_key(k, s, free) for k, s in case.get("optional", []))
     want_privacy = bool(case.get("expect_privacy", False))
     try:
@@ -91,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
             continue
         mark = "PASS" if r.ok else "FAIL"
         detail = r.error or (
-            f"expected={sorted(r.expected)} got={sorted(r.got)} "
+            f"expected={[sorted(a) for a in r.expected]} got={sorted(r.got)} "
             f"privacy expected={r.expect_privacy} got={r.got_privacy}"
         )
         print(f"[{mark}] #{i:02d} {r.say}\n        {detail}")

@@ -74,19 +74,18 @@ uv run python eval/run_extraction_eval.py
 uv run python eval/run_memory_eval.py
 ```
 
-Latest results (2026-09-27, `gpt-4.1-mini`, same scores on 3 consecutive runs):
+Latest results (2026-09-27, `gpt-4.1-mini`, 3 runs each):
 
 | Eval | Cases | Accuracy (target) | Recall (target) | False positives |
 |---|---|---|---|---|
-| Symptom extraction | 30 | 30/30 = 100% (≥ 90%) | red flags 10/10 = 100% (100%) | 0 false red flags |
-| Memory extraction | 25 | 20/25 = 80% (≥ 90%) | privacy requests 5/5 = 100% (100%) | 0 false privacy requests |
+| Symptom extraction | 30 | 30/30 = 100% on every run (≥ 90%) | red flags 10/10 = 100% (100%) | 0 false red flags |
+| Memory extraction | 25 | 23–24/25 = 92–96% (≥ 90%) | privacy requests 5/5 = 100% (100%) | 0 false privacy requests |
 
-All 5 memory misses are subject wording, not missed memories: the model finds the right
-plan or topic but names it differently from the expected label (`eye doctor appointment`
-vs `eye doctor`, `visit from Amy` vs `Amy's visit`, `community choir` vs
-`choir rehearsal`, `month rose` vs `roses`), and one private plan came back as
-`follow_up: dog` instead of `topic: getting a dog`. The scorer requires every expected
-subject; listed `optional` synonyms may appear alongside it but do not replace it.
+Memory cases may list synonyms for an expected subject (`[eye doctor, eye doctor appointment]`),
+since the extractor names the same plan in different words from run to run. The remaining
+misses: one private plan comes back as `follow_up: getting a dog` instead of
+`topic: getting a dog` (every run), and 月季 is sometimes translated as `monthly rose`, which
+is not on the synonym list.
 
 ## Fall detection (fall-mcp)
 
@@ -115,6 +114,27 @@ From the terminal: `--source 0` (or `FALL_SOURCE=0`). On Apple Silicon set `FALL
 
 MCP: Streamable HTTP at `http://127.0.0.1:8001/mcp`, or stdio for Claude Desktop — see
 [docs/mcp_desktop.md](docs/mcp_desktop.md).
+
+## Demo media and licenses
+
+The fall-detection demo clips (also shown in our demo video) come from the
+[UR Fall Detection Dataset](https://fenix.ur.edu.pl/~mkepski/ds/uf.html) by Bogdan Kwolek and
+Michal Kepski (University of Rzeszow), licensed under
+[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) for non-commercial
+academic use. We use them only for this non-commercial demo. The clips are not stored in this
+repo: `scripts/fetch_demo_media.py` downloads them and keeps the RGB half, upscales it to
+640x480 and holds the last frame for 4 s; these edited clips stay under the same license. See
+[demo/videos/README.md](demo/videos/README.md) for which recording each clip comes from.
+
+Dataset citation: B. Kwolek, M. Kepski, "Human fall detection on embedded platform using depth
+maps and wireless accelerometer", *Computer Methods and Programs in Biomedicine* 117(3),
+pp. 489–501, 2014.
+
+Pose model: [Ultralytics YOLO11](https://github.com/ultralytics/ultralytics) `yolo11n-pose.pt`
+(AGPL-3.0), also downloaded by the script, not stored in the repo.
+
+The screenshots in `demo/shots/` are of this app running on seeded demo data; the elder and
+family members in them (Maggie, Amy, Ben) are fictional.
 
 ## Layout
 
