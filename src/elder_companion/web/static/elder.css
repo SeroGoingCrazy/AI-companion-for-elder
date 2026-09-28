@@ -48,6 +48,8 @@ body {
 /* ---------- header ---------- */
 
 .elder-header { display: flex; align-items: center; gap: 13px; flex: none; }
+.elder-brand { display: flex; align-items: center; gap: 13px; }
+.elder-tools { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
 .avatar { width: 42px; height: 42px; flex: none; }
 .avatar .disc { fill: var(--amber); }
@@ -77,12 +79,66 @@ body {
 }
 .start-btn {
   min-height: 74px; padding: 0 44px;
-  border: 0; border-radius: var(--r-control);
-  background: var(--amber); color: var(--ink);
+  border: 0; border-radius: 999px;
+  /* Raised on purpose (redesign 2.1): the one button on this screen has to read as a
+     thing you press, so it gets a lit top edge, a carved bottom edge and a lift. */
+  background: linear-gradient(180deg, var(--start-top) 0%, var(--start-bottom) 100%);
+  color: #fff;
   font-family: var(--face-ui); font-size: 26px; font-weight: 700; cursor: pointer;
-  box-shadow: 0 5px 0 var(--amber-deep);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.25),
+    inset 0 -3px 4px rgba(0, 0, 0, 0.20),
+    inset 0 2px 3px rgba(255, 255, 255, 0.30);
+  /* White on marigold is short of 3:1 on its own; the shadow carries the letterforms. */
+  text-shadow: 0 1px 2px rgba(110, 55, 0, 0.35);
 }
-.start-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--amber-deep); }
+.start-btn:active {
+  transform: translateY(2px);
+  box-shadow:
+    0 1px 4px rgba(0, 0, 0, 0.25),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.20),
+    inset 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+.start-btn:focus-visible { outline: 4px solid var(--ink); outline-offset: 4px; }
+
+/* ---------- the start screen (redesign 3.1) ----------
+ * The one screen she sees every time, so it gets the warmth: a golden-hour sunflower
+ * field behind everything, washed with paper so the type keeps its contrast. It stays
+ * marigold rather than the family surface's terracotta, matching the Figma frame.
+ * The field is a drawn placeholder; a licensed photo can replace the url later. */
+body.elder {
+  /* The elder surface keeps the original marigold throughout, so the start screen and the
+     talk bar are one colour. Labels on it are ink (6.4:1); only the start button is white,
+     as drawn. The family surface is terracotta. */
+  --amber:      #E0900F;
+  --amber-deep: #A96A06;
+  --amber-wash: #FBEFD8;
+  --on-amber:   var(--ink);
+  --start-top: #F09C12;
+  --start-bottom: #DC8307;
+}
+body.elder:has(#start-screen:not([hidden])) {
+  background:
+    linear-gradient(rgba(246, 241, 231, 0.62), rgba(246, 241, 231, 0.62)),
+    url("/static/img/sunflower-field.svg") center / cover no-repeat,
+    var(--paper);
+}
+
+/* Brand top-left; voices and language sit centred right above the greeting, so the
+   whole thing reads as one group: choose how she sounds, then start. */
+.elder-app:has(#start-screen:not([hidden])) .elder-header {
+  flex: 0 0 32%; flex-direction: column; align-items: stretch; justify-content: space-between;
+}
+.elder-app:has(#start-screen:not([hidden])) .elder-tools { margin: 0 auto; justify-content: center; gap: 9px; }
+.elder-app:has(#start-screen:not([hidden])) .voice-switch { gap: 9px; }
+.elder-app:has(#start-screen:not([hidden])) .voice-switch button,
+.elder-app:has(#start-screen:not([hidden])) .lang-switch {
+  background: rgba(253, 251, 247, 0.85); border-color: rgba(227, 217, 201, 0.9);
+}
+.elder-app:has(#start-screen:not([hidden])) .voice-switch button[aria-pressed="true"] {
+  background: #FDF3DF; border-color: var(--amber); color: var(--ink);
+}
+.elder-app:has(#start-screen:not([hidden])) .start { justify-content: flex-start; padding-top: 34px; gap: 24px; }
 
 /* ---------- conversation ----------
  * Class names come from elder.js (`bubble assistant` / `bubble user`); it keeps only the
@@ -121,7 +177,7 @@ body {
   margin-top: 12px; min-height: var(--tap); padding: 0 20px 0 16px;
   display: inline-flex; align-items: center; gap: 9px;
   border: 0; border-radius: var(--r-chip);
-  background: var(--amber); color: var(--ink);
+  background: var(--amber); color: var(--on-amber);
   font-family: var(--face-ui); font-size: 19px; font-weight: 700; line-height: 1;
   cursor: pointer; -webkit-tap-highlight-color: transparent;
   box-shadow: 0 3px 0 var(--amber-deep);
@@ -151,7 +207,7 @@ body {
   flex: none; width: 100%; min-height: 84px;
   display: flex; align-items: center; justify-content: center; gap: 13px;
   border: 0; border-radius: var(--r-control);
-  background: var(--amber); color: var(--ink);
+  background: var(--amber); color: var(--on-amber);
   font-family: var(--face-ui); font-size: 26px; font-weight: 700;
   cursor: pointer; user-select: none; -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent; touch-action: none;

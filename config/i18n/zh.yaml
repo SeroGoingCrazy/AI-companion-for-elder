@@ -7,7 +7,7 @@ dir: ltr
 elder:
   subtitle: "{nickname}，我一直在这儿"
   greeting: "{nickname}，您好！"
-  start: 开始聊天
+  start: 开始今天的聊天！
   hold_to_talk: 按住说话
   press_and_speak: 按住说话
   release_to_send: 松开就发送

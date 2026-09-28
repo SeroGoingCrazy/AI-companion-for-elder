@@ -6,8 +6,8 @@ dir: ltr
 
 elder:
   subtitle: Here for you, {nickname}
-  greeting: "Hello, {nickname}!"
-  start: Start chatting
+  greeting: "Hallo, {nickname}!"
+  start: Start today's chat!
   hold_to_talk: Hold to talk
   press_and_speak: Hold and speak
   release_to_send: Release to send

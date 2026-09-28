@@ -18,7 +18,7 @@ def test_elder_page_renders_persona_and_config(client: TestClient) -> None:
     assert r.status_code == 200
     html = r.text
     assert "<title>Hallo</title>" in html
-    assert "Hello, Maggie!" in html
+    assert "Hallo, Maggie!" in html
     assert 'id="mic-btn"' in html
     # Assert on what the page hands the scripts, not on the literal. The object keeps
     # gaining fields — voices, language, the string table — and an exact-match assertion
