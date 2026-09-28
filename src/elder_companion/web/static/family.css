@@ -297,6 +297,10 @@ body {
   background: var(--paper);
 }
 .alert-item > img { grid-column: 2 / -1; }
+/* The snapshot link and the claim row belong under the text, never in the icon column:
+   auto-placed there, their width set the icon column and crushed the text beside it. */
+.alert-item > .snapshot, .alert-item > .claim { grid-column: 2 / -1; }
+.alert-item > .claim { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
 /* Nothing in the page may exceed the viewport: a horizontal scroll moves the fixed tab
    bar out from under the thumb, and on a phone that reads as "the app is broken". */
