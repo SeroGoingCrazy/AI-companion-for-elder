@@ -81,16 +81,15 @@ def test_cache_version_follows_the_assets(client: TestClient) -> None:
     assert version(client) == before, "stable while nothing changes"
 
     from elder_companion.web.routes.pages import WEB_DIR
-    from elder_companion.web.routes.pwa import _build_id
 
+    # No cache_clear: an edit while the server is running has to be picked up on its own,
+    # or phones keep the old stylesheet until someone restarts it.
     probe = WEB_DIR / "static" / "_version_probe.tmp"
     probe.write_text("x", encoding="utf-8")
     try:
-        _build_id.cache_clear()
         assert version(client) != before, "an asset changed but the cache name did not"
     finally:
         probe.unlink()
-        _build_id.cache_clear()
     assert version(client) == before
 
 

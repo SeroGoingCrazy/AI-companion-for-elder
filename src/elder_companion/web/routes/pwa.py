@@ -95,20 +95,32 @@ def family_manifest(request: Request) -> JSONResponse:
     )
 
 
-@lru_cache(maxsize=1)
 def _build_id() -> str:
     """A digest of everything the worker precaches.
 
     The cache name is derived from the assets themselves so that changing a stylesheet
-    invalidates the old cache automatically. Cached in-process: the files do not change
-    while the server runs, and hashing them per request would be wasted work.
+    invalidates the old cache automatically. The files do change while the server runs
+    (an edit during development, a pull on the demo machine), so the key is re-read on
+    every request from each file's size and mtime, which is a stat, and the contents are
+    only hashed again when that key moves. Caching the digest for the life of the process
+    kept serving the previous stylesheet to every phone that had opened the app.
     """
+    static = WEB_DIR / "static"
+    stamp = tuple(
+        (p.relative_to(static).as_posix(), st.st_size, st.st_mtime_ns)
+        for p in sorted(static.rglob("*"))
+        if p.is_file() and (st := p.stat())
+    )
+    return _digest(stamp)
+
+
+@lru_cache(maxsize=4)
+def _digest(stamp: tuple[tuple[str, int, int], ...]) -> str:
     digest = hashlib.sha256()
     static = WEB_DIR / "static"
-    for path in sorted(static.rglob("*")):
-        if path.is_file():
-            digest.update(path.relative_to(static).as_posix().encode())
-            digest.update(path.read_bytes())
+    for rel, _size, _mtime in stamp:
+        digest.update(rel.encode())
+        digest.update((static / rel).read_bytes())
     return digest.hexdigest()[:12]
 
 
