@@ -330,6 +330,10 @@ body {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: start;
   padding: 12px 14px; border: 1px solid var(--rule); border-radius: var(--r-card);
 }
+/* One column: a reminder has a toggle beside it, a care item does not. Sharing the two
+   columns put her quote in the `auto` one, which grew to the whole unwrapped sentence
+   and crushed the title into a strip one letter wide on a phone. */
+.care-item { grid-template-columns: minmax(0, 1fr); }
 .care-item:last-child { margin-bottom: 0; }
 .care-title, .reminder-text { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
 .care-kind, .reminder-when-label { margin: 0; font-size: 13px; color: var(--ink-3); }
