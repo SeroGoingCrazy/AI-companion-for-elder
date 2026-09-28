@@ -74,6 +74,20 @@ uv run python eval/run_extraction_eval.py
 uv run python eval/run_memory_eval.py
 ```
 
+Latest results (2026-09-27, `gpt-4.1-mini`, same scores on 3 consecutive runs):
+
+| Eval | Cases | Accuracy (target) | Recall (target) | False positives |
+|---|---|---|---|---|
+| Symptom extraction | 30 | 30/30 = 100% (≥ 90%) | red flags 10/10 = 100% (100%) | 0 false red flags |
+| Memory extraction | 25 | 20/25 = 80% (≥ 90%) | privacy requests 5/5 = 100% (100%) | 0 false privacy requests |
+
+All 5 memory misses are subject wording, not missed memories: the model finds the right
+plan or topic but names it differently from the expected label (`eye doctor appointment`
+vs `eye doctor`, `visit from Amy` vs `Amy's visit`, `community choir` vs
+`choir rehearsal`, `month rose` vs `roses`), and one private plan came back as
+`follow_up: dog` instead of `topic: getting a dog`. The scorer requires every expected
+subject; listed `optional` synonyms may appear alongside it but do not replace it.
+
 ## Fall detection (fall-mcp)
 
 Needs the optional vision dependencies, the pose model and the demo clips
