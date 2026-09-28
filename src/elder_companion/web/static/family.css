@@ -196,8 +196,19 @@ body {
 .history-card summary::-webkit-details-marker { display: none; }
 .history-card summary h2 { display: inline; font-size: 20px; margin: 0; }
 .history-list { list-style: none; margin: 13px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.history-msg { padding: 11px 14px; border-radius: var(--r-card); background: var(--paper); border: 1px solid var(--rule); }
-.history-msg.user { align-self: flex-end; background: var(--amber-wash); border-color: #EADCC0; }
+/* A messaging layout (redesign 2.4): the companion on the left, her on the right, so who
+   is talking reads at a glance. The bubble sizes to its text; a full-width bubble has
+   nowhere to be pushed. The tail corner points at the speaker's side. */
+.history-msg {
+  width: fit-content; max-width: 80%; min-width: 0; overflow-wrap: anywhere;
+  padding: 11px 14px; border: 1px solid var(--rule); background: var(--paper);
+  align-self: flex-start; border-radius: var(--r-card) var(--r-card) var(--r-card) 6px;
+}
+.history-msg.user {
+  align-self: flex-end; background: var(--amber-wash); border-color: var(--amber-edge);
+  border-radius: var(--r-card) var(--r-card) 6px var(--r-card);
+}
+.history-msg.user .meta { text-align: right; }
 .history-msg .meta { margin: 0 0 3px; color: var(--ink-3); font-size: 13px; }
 .history-msg p:last-child { margin: 0; }
 
@@ -211,6 +222,12 @@ body {
   border: 1px solid var(--rule); background: var(--paper-lift); color: var(--ink);
 }
 .btn:active { background: var(--amber-wash); }
+
+/* Hierarchy (redesign 2.5): a commitment ("I'll handle this", "Add reminder") is filled,
+   a dismissal ("Mark as read", "Cancel") is an outline, so the two never read as equals. */
+.btn-primary, .btn-attention { background: var(--amber); border-color: var(--amber); color: var(--on-amber); }
+.btn-primary:active, .btn-attention:active { background: var(--amber-deep); border-color: var(--amber-deep); }
+.btn-secondary { background: #fff; border-color: #6B6455; color: var(--ink); }
 .btn-quiet { background: var(--paper-lift); }
 .btn-small { min-height: 36px; padding: 0 12px; }
 .btn-light { background: #fff; color: var(--alarm); border-color: #fff; }
@@ -259,7 +276,9 @@ body {
 }
 .tabbar button svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 1.9;
                      stroke-linecap: round; stroke-linejoin: round; }
-.tabbar button[aria-selected="true"] { color: var(--amber-deep); }
+/* The active tab sits on a soft terracotta pill (redesign 2.2), not just a recoloured icon. */
+.tabbar button { margin: 5px 4px; border-radius: 20px; min-height: calc(var(--tabbar-h) - 10px); }
+.tabbar button[aria-selected="true"] { color: var(--amber); background: var(--amber-halo); }
 .tabbar .tab-dot {
   position: absolute; transform: translate(13px, -11px);
   min-width: 17px; height: 17px; padding: 0 4px; border-radius: var(--r-chip);
@@ -377,7 +396,6 @@ body {
   background: var(--paper-lift); color: var(--ink); font-family: var(--face-ui); font-size: 14px;
 }
 .reminder-radio input:disabled { opacity: .5; }
-.btn-attention { background: var(--amber); border-color: var(--amber); color: var(--ink); }
 .reminder-form .btn-attention { justify-self: start; }
 .reminder-error { margin: 0; color: var(--alarm); font-size: 13px; font-weight: 700; }
 
@@ -411,5 +429,5 @@ body {
    card, so the buttons are light-on-dark rather than the page's default. */
 .fall-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .fall-controls .btn { border-color: rgba(255,255,255,.4); color: var(--paper-lift); background: transparent; }
-.fall-controls .btn[aria-pressed="true"] { background: var(--amber); border-color: var(--amber); color: var(--ink); }
+.fall-controls .btn[aria-pressed="true"] { background: var(--amber); border-color: var(--amber); color: var(--on-amber); }
 .fall-error { margin: 10px 0 0; color: #F0A99B; font-size: var(--t-meta); font-weight: 700; }

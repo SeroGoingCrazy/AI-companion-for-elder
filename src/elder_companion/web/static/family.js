@@ -119,7 +119,7 @@
       : null;
     const read = a.is_read
       ? null
-      : el("button", { class: "btn btn-quiet btn-small", type: "button", text: S.mark_read, onclick: () => markRead(a.id) });
+      : el("button", { class: "btn btn-secondary btn-small", type: "button", text: S.mark_read, onclick: () => markRead(a.id) });
     return el("li", { class: `alert-item level-${a.level}${a.is_read ? " is-read" : ""}`, "data-id": a.id },
       el("div", { class: "alert-icon", "aria-hidden": "true", text: isFall ? "🧍" : "🩺" }),
       el("div", { class: "alert-main" },
@@ -522,8 +522,8 @@
     const input = el("input", { type: "text", class: "claim-input", maxlength: "500",
       placeholder: "e.g. I'll call her doctor", "aria-label": "What you'll do (optional)" });
     const form = el("form", { class: "claim-form" }, input,
-      el("button", { type: "submit", class: "btn btn-small btn-attention", text: "Save" }),
-      el("button", { type: "button", class: "btn btn-small", text: "Cancel",
+      el("button", { type: "submit", class: "btn btn-small btn-primary", text: "Save" }),
+      el("button", { type: "button", class: "btn btn-small btn-secondary", text: "Cancel",
         onclick: () => box.replaceWith(claimWidget(targetType, targetId)) }));
     form.addEventListener("submit", (ev) => { ev.preventDefault(); saveClaim(targetType, targetId, input.value.trim()); });
     box.replaceChildren(form);
@@ -539,9 +539,9 @@
       const who = c.member_id === memberId ? "You are" : `${c.member_name} is`;
       box.append(
         el("span", { class: "claim-badge", text: `${who} handling this${c.note ? `: “${c.note}”` : ""}` }),
-        el("button", { type: "button", class: "btn btn-small", text: "Mark done", onclick: () => finishClaim(c) }));
+        el("button", { type: "button", class: "btn btn-small btn-primary", text: "Mark done", onclick: () => finishClaim(c) }));
     } else if (memberId != null) {
-      box.append(el("button", { type: "button", class: "btn btn-small", text: "I'll handle this",
+      box.append(el("button", { type: "button", class: "btn btn-small btn-primary", text: "I'll handle this",
         onclick: () => claimForm(targetType, targetId, box) }));
     }
     return box;

@@ -27,10 +27,16 @@
   --ink-3:      #786D63;   /* meta text.                  4.5:1 on paper */
   --rule:       #E3D9C9;   /* hairlines */
 
-  /* one committed accent, warm and saturated */
-  --amber:      #E0900F;   /* controls.        ink on amber 6.4:1 */
-  --amber-deep: #A96A06;   /* the solid edge under a pressed control */
-  --amber-wash: #FBEFD8;   /* tint behind amber content */
+  /* one committed accent, warm and saturated. Terracotta since the Hallo redesign
+     (Figma "TieHub - Hallo"); the name stays so nothing downstream has to change.
+     Labels on it are white now: white on amber 4.2:1, which clears the 3:1 large-text
+     bar for the bold 19px+ labels the filled controls use. */
+  --amber:      #C1603A;   /* controls */
+  --amber-deep: #8E4226;   /* the solid edge under a pressed control */
+  --amber-wash: #F8E6DC;   /* tint behind amber content */
+  --amber-edge: #EBCDBD;   /* hairline around amber-wash */
+  --amber-halo: rgba(193, 96, 58, 0.12);   /* the pill behind the active tab */
+  --on-amber:   #FFFFFF;
 
   /* state — these carry meaning, so they are the only other hues */
   --alarm:      #B3341B;   /* red flag.        white on alarm 6.1:1 */
