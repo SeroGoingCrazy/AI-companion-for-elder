@@ -37,6 +37,12 @@ For real conversation and real speech, put a key in `.env` and run:
 If port 8000 is taken, `PORT=8100 ./scripts/demo_up.sh` moves everything, including the
 addresses it prints.
 
+While developing, `./scripts/dev_up.sh` restarts the web app and fall detection together
+with both logs in one terminal. It leaves `.env` as it is and replaces whatever is already
+on the two ports. Fall detection starts idle: pick Camera or Demo video on the dashboard.
+Run it from your own terminal app, since macOS gives camera access to the app that
+launched it.
+
 ## On a phone
 
 ```bash
